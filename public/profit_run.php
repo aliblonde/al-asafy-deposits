@@ -168,7 +168,7 @@ include __DIR__ . '/../includes/header.php';
                             <?php if ($targetDeposit): ?>
                                 سيتم فحص الوديعة <strong>#<?= $targetDeposit['id'] ?></strong> للمستثمر
                                 <strong><?= htmlspecialchars($targetDeposit['full_name']) ?></strong>.
-                                إذا كان قد حان موعد السحب التراكمي ولديها أرباح مجمعة، سيتم صرفها كعملية مالية رسمية.
+                                اختر طريقة الصرف أدناه لإتمام العملية المالية.
                             <?php else: ?>
                                 سيتم فحص <strong>جميع الودائع النشطة</strong>. أي وديعة وصلت لموعد السحب المتفق عليه (دورية
                                 الربح) ولديها أرباح تراكمية سيتم تحويل هذه الأرباح مباشرة إلى سجل الصرفيات للمستثمرين.
@@ -181,42 +181,6 @@ include __DIR__ . '/../includes/header.php';
                                 <?= csrfField() ?>
                                 
                                 <?php if ($targetDeposit): ?>
-                                    <div class="card bg-base border border-gold text-start mx-auto p-4 mb-4" style="max-width: 550px; border-radius: 12px;">
-                                        <h5 class="text-gold mb-3 border-bottom pb-2" style="font-weight: 700;">
-                                            <i class="bi bi-info-circle me-2"></i>تفاصيل الصرف اليدوي والتراكمي
-                                        </h5>
-                                        <div class="row g-3 mb-3">
-                                            <div class="col-6">
-                                                <span class="text-muted small d-block">المستثمر:</span>
-                                                <span class="fw-bold text-white"><?= htmlspecialchars($targetDeposit['full_name']) ?></span>
-                                            </div>
-                                            <div class="col-6">
-                                                <span class="text-muted small d-block">قيمة الوديعة:</span>
-                                                <span class="fw-bold text-gold"><?= formatMoney($targetDeposit['amount'], $targetDeposit['currency']) ?></span>
-                                            </div>
-                                            <div class="col-6">
-                                                <span class="text-muted small d-block">الأرباح التراكمية بالنظام:</span>
-                                                <span class="fw-bold text-success"><?= formatMoney($targetDeposit['accumulated_profit'], $targetDeposit['currency']) ?></span>
-                                            </div>
-                                            <div class="col-6">
-                                                <span class="text-muted small d-block">تاريخ البداية:</span>
-                                                <span class="text-white"><?= formatDate($targetDeposit['start_date']) ?></span>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label text-gold fw-bold mb-1">مبلغ الصرف الفعلي (إدخال يدوي):</label>
-                                            <div class="input-group">
-                                                <input type="number" name="disburse_amount" class="form-control text-center fw-bold form-control-lg" step="0.01" min="0.01" 
-                                                       value="<?= htmlspecialchars((float)$targetDeposit['accumulated_profit']) ?>" required placeholder="0.00">
-                                                <span class="input-group-text bg-gold text-black fw-bold"><?= currencySymbol($targetDeposit['currency']) ?></span>
-                                            </div>
-                                            <div class="form-text text-muted small mt-1">يمكنك تعديل هذا المبلغ وإدخاله يدوياً وسيتم تصفير الأرباح التراكمية لهذه الدورة.</div>
-                                        </div>
-                                        <div class="mb-2">
-                                            <label class="form-label text-gold fw-bold mb-1">الملاحظة:</label>
-                                            <input type="text" name="note" class="form-control form-control-sm" value="صرف أرباح تراكمية مستحقة">
-                                        </div>
                                     </div>
                                 <?php endif; ?>
 

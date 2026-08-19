@@ -324,35 +324,23 @@ include __DIR__ . '/../includes/header.php';
                                     <td>
                                         <?php if ($d['status'] === 'active' || ($d['status'] === 'completed' && $d['withdraw_count'] == 0)): ?>
                                              <div class="d-flex flex-wrap gap-1 align-items-center">
-                                                 <?php if ($isDue && $hasProfit): ?>
-                                                     <a href="profit_run.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-gold"
-                                                         title="صرف الأرباح">
-                                                         <i class="bi bi-cash-stack"></i> صرف
-                                                     </a>
-                                                 <?php elseif ($isDue && !$hasProfit): ?>
-                                                     <a href="profit_run.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-warning"
-                                                         title="إدخال وصرف الأرباح يدوياً">
-                                                         <i class="bi bi-cash"></i> صرف يدوي
+                                                 <?php if ($isDue): ?>
+                                                     <a href="profit_run.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-gold fw-bold px-3"
+                                                         title="صرف الأرباح (تراكمية أو مبلغ يدوي مخصص)">
+                                                         <i class="bi bi-wallet2 me-1"></i> صرف الأرباح
                                                      </a>
                                                  <?php else: ?>
                                                      <button class="btn btn-sm btn-outline-secondary" disabled
-                                                         title="لم يحن موعد السحب">
-                                                         <i class="bi bi-lock"></i> غير متاح
+                                                         title="غير مستحقة للصرف بعد (تستحق بتاريخ: <?= formatDate($nextStr) ?>)">
+                                                         <i class="bi bi-lock me-1"></i> غير مستحقة
                                                      </button>
                                                  <?php endif; ?>
 
                                                  <?php if ($d['status'] === 'active'): ?>
-                                                     <?php if ($isDue): ?>
-                                                         <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
-                                                             title="إضافة ربح يدوي يتراكم في الحساب">
-                                                             <i class="bi bi-plus-circle"></i> ربح يدوي
-                                                         </a>
-                                                     <?php else: ?>
-                                                         <button class="btn btn-sm btn-outline-secondary" disabled
-                                                             title="لا يمكن إضافة أو صرف ربح قبل موعد الاستحقاق (تستحق بتاريخ: <?= formatDate($nextStr) ?>)">
-                                                             <i class="bi bi-plus-circle"></i> ربح يدوي
-                                                         </button>
-                                                     <?php endif; ?>
+                                                      <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
+                                                          title="إضافة ربح شهري يتراكم في حافظة الوديعة">
+                                                          <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
+                                                      </a>
                                                  <?php endif; ?>
 
                                                  <?php if ($isReadyToClose): ?>
