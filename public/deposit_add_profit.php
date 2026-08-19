@@ -44,6 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($month) || !preg_match('/^\d{4}-\d{2}$/', $month)) {
         $errors[] = 'الشهر المدخل غير صالح.';
+    } elseif ($month > date('Y-m')) {
+        $errors[] = 'عفواً، لا يجوز إضافة أو صرف أرباح لشهر مستقبلي قبل حلول موعد استحقاقه.';
     }
     
     if ($amount <= 0) {

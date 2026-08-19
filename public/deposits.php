@@ -342,10 +342,17 @@ include __DIR__ . '/../includes/header.php';
                                                  <?php endif; ?>
 
                                                  <?php if ($d['status'] === 'active'): ?>
-                                                     <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
-                                                         title="إضافة ربح يدوي يتراكم في الحساب">
-                                                         <i class="bi bi-plus-circle"></i> ربح يدوي
-                                                     </a>
+                                                     <?php if ($isDue): ?>
+                                                         <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
+                                                             title="إضافة ربح يدوي يتراكم في الحساب">
+                                                             <i class="bi bi-plus-circle"></i> ربح يدوي
+                                                         </a>
+                                                     <?php else: ?>
+                                                         <button class="btn btn-sm btn-outline-secondary" disabled
+                                                             title="لا يمكن إضافة أو صرف ربح قبل موعد الاستحقاق (تستحق بتاريخ: <?= formatDate($nextStr) ?>)">
+                                                             <i class="bi bi-plus-circle"></i> ربح يدوي
+                                                         </button>
+                                                     <?php endif; ?>
                                                  <?php endif; ?>
 
                                                  <?php if ($isReadyToClose): ?>

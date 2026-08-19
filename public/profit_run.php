@@ -80,10 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nextWithdrawal = calcNextWithdrawalDate($dep);
         $dueStr = $nextWithdrawal ? $nextWithdrawal->format('Y-m-d') : null;
 
-        // If it's not due yet, skip (ONLY for automated/multi-run, or if it is single deposit but not manual)
-        if (!$isManual && (!$dueStr || $dueStr > $today)) {
-            if ($depositId)
-                $runErrors[] = "لم يحن موعد السحب التراكمي لهذه الوديعة. الموعد القادم: " . formatDate($dueStr);
+        // STRICT RULE: No profit disbursement allowed before the due date under any circumstances
+        if (!$dueStr || $dueStr > $today) {
+            $runErrors[] = "عفواً، لا يجوز صرف الأرباح للوديعة #{$dep['id']} قبل موعد استحقاقها القادم بتاريخ: " . formatDate($dueStr);
             $skipped++;
             continue;
         }
@@ -106,14 +105,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $note
                     ]);
 
-            // 2. Reset accumulated profit to 0 and update last_withdrawal_date
-            $useDueDate = ($dueStr && $dueStr <= $today) ? $dueStr : $dep['last_withdrawal_date'];
-            if (!$useDueDate) {
-                $useDueDate = $today; // Fallback
-            }
+            // 2. Update accumulated_profit and last_withdrawal_date
+            $useDueDate = ($dueStr && $dueStr <= $today) ? $dueStr : $today;
+            $newAccumulated = max(0.00, $accumulated - $amountToDisburse);
 
-            $pdo->prepare("UPDATE deposits SET accumulated_profit = 0.00, last_withdrawal_date = ? WHERE id = ?")
-                ->execute([$useDueDate, $dep['id']]);
+            $pdo->prepare("UPDATE deposits SET accumulated_profit = ?, last_withdrawal_date = ? WHERE id = ?")
+                ->execute([$newAccumulated, $useDueDate, $dep['id']]);
 
             $pdo->commit();
 

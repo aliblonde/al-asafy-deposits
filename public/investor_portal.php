@@ -94,19 +94,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($amount <= 0) {
         setFlash('danger', 'المبلغ يجب أن يكون أكبر من صفر.');
     } else {
-        $pdo->prepare(
-            "INSERT INTO withdraw_requests (investor_id, amount, currency, request_date, status, note)
-             VALUES (?, ?, ?, NOW(), 'pending', ?)"
-        )->execute([$investorId, $amount, $currency, $note]);
-        logActivity(
-            $pdo,
-            'REQUEST_WITHDRAW',
-            'withdraw_requests',
-            null,
-            null,
-            ['investor_id' => $investorId, 'amount' => $amount]
-        );
-        setFlash('success', 'تم تقديم طلب السحب بنجاح. سيتم مراجعته من قِبل الإدارة.');
+        // Calculate Net Available Profit Balance for the requested currency
+        $profitStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE investor_id = ? AND type = 'profit' AND currency = ?");
+        $profitStmt->execute([$investorId, $currency]);
+        $totalEarnedProfits = (float) $profitStmt->fetchColumn();
+
+        $withdrawnStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE investor_id = ? AND type = 'withdraw' AND currency = ?");
+        $withdrawnStmt->execute([$investorId, $currency]);
+        $totalPaidWithdrawals = (float) $withdrawnStmt->fetchColumn();
+
+        $pendingStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM withdraw_requests WHERE investor_id = ? AND status IN ('pending', 'approved') AND currency = ?");
+        $pendingStmt->execute([$investorId, $currency]);
+        $totalPendingWithdrawals = (float) $pendingStmt->fetchColumn();
+
+        $netAvailableBalance = max(0.00, $totalEarnedProfits - $totalPaidWithdrawals - $totalPendingWithdrawals);
+
+        if ($amount > $netAvailableBalance) {
+            setFlash('danger', 'عفواً، رصيد الأرباح المتاح للسحب لديك بـ (' . $currency . ') هو ' . formatMoney($netAvailableBalance, $currency) . ' فقط. لا يمكنك طلب سحب مبلغ أكبر.');
+        } else {
+            $pdo->prepare(
+                "INSERT INTO withdraw_requests (investor_id, amount, currency, request_date, status, note)
+                 VALUES (?, ?, ?, NOW(), 'pending', ?)"
+            )->execute([$investorId, $amount, $currency, $note]);
+            logActivity(
+                $pdo,
+                'REQUEST_WITHDRAW',
+                'withdraw_requests',
+                null,
+                null,
+                ['investor_id' => $investorId, 'amount' => $amount, 'currency' => $currency]
+            );
+            setFlash('success', 'تم تقديم طلب السحب بنجاح. سيتم مراجعته من قِبل الإدارة.');
+        }
     }
     header('Location: investor_portal.php');
     exit;

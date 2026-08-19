@@ -62,6 +62,20 @@ function calcNextWithdrawalDate(array $deposit): ?DateTimeImmutable
     return $dt->modify('+' . $freq . ' month');
 }
 
+/**
+ * Check if the deposit's profit payout is due on or before the target date (default today).
+ */
+function isDepositProfitDue(array $deposit, ?string $targetDate = null): bool
+{
+    $dueDate = calcNextWithdrawalDate($deposit);
+    if (!$dueDate) {
+        return false;
+    }
+    $checkDate = $targetDate ?: date('Y-m-d');
+    return $dueDate->format('Y-m-d') <= $checkDate;
+}
+
+
 /** Format amount with currency symbol */
 function formatMoney(string|float|null $amount, string $currency = 'IQD'): string
 {
