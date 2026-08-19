@@ -1,0 +1,7 @@
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+RewriteRule ^onlineview/([^/]+)/?$ onlineview.php?code=$1 [L,QSA,NE]
+<FilesMatch "^(database|sample-data)\.sql$">
+  Require all denied
+</FilesMatch>

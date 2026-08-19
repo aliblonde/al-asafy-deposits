@@ -1,0 +1,1 @@
+<?php $page_title='Edit Employee';require_once __DIR__.'/../includes/admin-header.php';require_admin();$s=db()->prepare('SELECT id,name,username,role FROM users WHERE id=?');$s->execute([(int)($_GET['id']??0)]);$account=$s->fetch();if(!$account){http_response_code(404);exit('Employee not found.');}require __DIR__.'/user-form.php';require __DIR__.'/../includes/admin-footer.php';

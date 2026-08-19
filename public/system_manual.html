@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الدليل التدريبي الشامل - نظام مجموعة العسافي</title>
+    <!-- خط تجوال لدعم العربية بشكل احترافي -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <!-- Bootstrap 5 RTL -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --bg-base: #0a0b0d;
+            --bg-surface: #141518;
+            --bg-surface-light: #1d1e22;
+            --gold: #D4AF37;
+            --gold-light: #E5C158;
+            --text-main: #f8f9fa;
+            --text-muted: #8c8f96;
+            --border: #2a2b30;
+        }
+
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            line-height: 1.9;
+            padding-bottom: 50px;
+        }
+
+        .header {
+            background-color: var(--bg-surface);
+            border-bottom: 2px solid var(--gold);
+            padding: 40px 0;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header img {
+            max-width: 180px;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.4));
+        }
+
+        .header h1 {
+            color: var(--gold);
+            font-weight: 800;
+            margin: 0;
+        }
+
+        .sidebar {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: sticky;
+            top: 20px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background-color: var(--gold);
+            border-radius: 3px;
+        }
+
+        .sidebar a {
+            color: var(--text-muted);
+            text-decoration: none;
+            display: block;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 4px;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .sidebar a:hover, .sidebar a.active {
+            color: var(--gold);
+            background-color: rgba(212, 175, 55, 0.1);
+        }
+
+        .content-section {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .content-section h2 {
+            color: var(--gold);
+            border-bottom: 1px dashed var(--border);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-weight: 700;
+        }
+
+        .content-section h4 {
+            color: var(--gold-light);
+            margin-top: 35px;
+            margin-bottom: 15px;
+        }
+
+        .step-box {
+            background-color: var(--bg-surface-light);
+            border-right: 4px solid var(--gold);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .step-num {
+            display: inline-block;
+            background: var(--gold);
+            color: #000;
+            width: 28px;
+            height: 28px;
+            text-align: center;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .table-custom {
+            color: var(--text-main);
+            border-color: var(--border);
+            margin-top: 20px;
+        }
+        
+        .table-custom th {
+            background-color: var(--bg-surface-light);
+            color: var(--gold);
+            border-color: var(--border);
+        }
+
+        .badge-gold { background-color: rgba(212, 175, 55, 0.2); color: var(--gold); border: 1px solid var(--gold); }
+        
+        .note-danger {
+            background-color: rgba(220, 53, 69, 0.1);
+            border-right: 4px solid #dc3545;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .note-info {
+            background-color: rgba(13, 110, 253, 0.1);
+            border-right: 4px solid #0d6efd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <img src="assets/img/ag-logo.png" alt="مجموعة العسافي" onerror="this.src=''">
+            <h1>الدليل التدريبي الشامل للموظفين</h1>
+            <p class="text-muted mt-2">مرجع العمليات المحاسبية، الودائع، الفلاتر، وصرف الأرباح خطوة بخطوة</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="row">
+            
+            <!-- Sidebar Navigation -->
+            <div class="col-lg-3 d-none d-lg-block">
+                <div class="sidebar">
+                    <h5 class="text-center mb-4 pb-2 border-bottom" style="color: var(--gold);">الفهرس التفصيلي</h5>
+                    <a href="#intro" class="active"><i class="bi bi-play-circle me-1"></i> ١. مقـدمـــة</a>
+                    <a href="#investors"><i class="bi bi-person-plus me-1"></i> ٢. إدارة المستثمرين</a>
+                    <a href="#deposits"><i class="bi bi-safe me-1"></i> ٣. إدارة وتأسيس الودائع</a>
+                    <a href="#profits"><i class="bi bi-cash-coin me-1"></i> ٤. نظام صرف الأرباح مفصل</a>
+                    <a href="#withdrawals"><i class="bi bi-bank me-1"></i> ٥. سحب وإرجاع رأس المال</a>
+                    <a href="#receipts"><i class="bi bi-receipt me-1"></i> ٦. الإيصالات والأرقام التسلسلية</a>
+                    <a href="#currencies"><i class="bi bi-currency-exchange me-1"></i> ٧. التعامل مع العملات</a>
+                    <a href="#reports"><i class="bi bi-printer me-1"></i> ٨. التقارير والبحث الذكي</a>
+                </div>
+            </div>
+
+            <!-- Content -->
+            <div class="col-lg-9">
+                
+                <!-- Section 1 -->
+                <section id="intro" class="content-section">
+                    <h2><i class="bi bi-play-circle me-2"></i> 1. مقـدمـــة</h2>
+                    <p>نظام "مجموعة العسافي" هو منصة مالية مبنية لضمان دقة الحسابات ومنع أي خطأ بشري أثناء إدارة محافظ العملاء. النظام يتعامل بصرامة مع الأرقام، لذلك كل "إيداع" أو "صرف أرباح" يتم تسجيلة بالملي ثانية ولا يمكن حذفه بسهولة دون ترك أثر محاسبي.</p>
+                </section>
+
+                <!-- Section 2 -->
+                <section id="investors" class="content-section">
+                    <h2><i class="bi bi-person-plus me-2"></i> 2. إدارة المستثمرين (بداية العمل)</h2>
+                    <p>لا يمكن للنظام استقبال أموال أو توزيع أرباح لأي شخص ما لم يكن مسجلاً كمستثمر رسمي في قاعدة البيانات.</p>
+                    
+                    <h4>كيفية فتح حساب لمستثمر جديد:</h4>
+                    <div class="step-box">
+                        <span class="step-num">1</span> التوجه إلى تبويبة <strong>"المستثمرون"</strong> في القائمة الجانبية.<br>
+                        <span class="step-num">2</span> الضغط على <strong>"إضافة مستثمر"</strong>.<br>
+                        <span class="step-num">3</span> كتابة الاسم الرباعي الصحيح، وتفاصيل الاتصال الخاصة به.<br>
+                        <span class="step-num">4</span> بمجرد الحفظ، يتولد للمستثمر <strong>"ملف أو كشف حساب خاص"</strong> (Profile)، والذي سيكون الوعاء الذي تصب فيه كافة أمواله وأرباحه مستقبلاً.
+                    </div>
+                </section>
+
+                <!-- Section 3 -->
+                <section id="deposits" class="content-section">
+                    <h2><i class="bi bi-safe me-2"></i> 3. إدارة وتأسيس الودائع (العقود)</h2>
+                    <p>الوديعة هي العقد الذي يبرم بين الشركة والمستثمر ويحدد قيمة المبلغ والنسبة ومدة بقاء المال.</p>
+
+                    <h4>أنواع الودائع المتوفرة:</h4>
+                    <ul>
+                        <li><strong class="text-gold">وديعة قصيرة الأجل:</strong> غالباً مدتها أشهر قليلة ونسبتها تكون مختلفة.</li>
+                        <li><strong class="text-gold">وديعة متوسطة الأجل:</strong> عقد يمتد لزمن متوسط.</li>
+                        <li><strong class="text-gold">وديعة طويلة الأجل:</strong> عقد مستمر لفترات طويلة.</li>
+                    </ul>
+
+                    <h4>كيفية تأسيس الوديعة (إدخال رأس المال):</h4>
+                    <p>عند تسليم المستثمر للمبلغ المالي، يجب على الموظف فتح وإيداع هذا المبلغ في النظام عبر الخطوات التالية:</p>
+                    <div class="step-box">
+                        <span class="step-num">1</span> الدخول لملف المستثمر المحدد.<br>
+                        <span class="step-num">2</span> الضغط على <strong>"إضافة معاملة"</strong> واختيار نوع المعاملة <strong>(إيداع)</strong>.<br>
+                        <span class="step-num">3</span> تحديد المبلغ، ونوع العملة (د.ع أو دولار)، وكتابة ملاحظة مثل <em>(تم استلام رأس المال نقداً / تسليم يدوي)</em>.<br>
+                        <span class="step-num">4</span> ثم الذهاب لقسم الودائع والضغط على <strong>"إضافة وديعة"</strong> وربط المبلغ المحصل بعقد نشط مع تحديد (النسبة المئوية الشهرية / أو السنوية) وتاريخ بدء ونهاية الوديعة لكي يتمكن النظام من بناء الميزانية بناءً عليها.
+                    </div>
+                </section>
+
+                <!-- Section 4 -->
+                <section id="profits" class="content-section">
+                    <h2><i class="bi bi-cash-coin me-2"></i> 4. نظام صرف الأرباح المفصل</h2>
+                    <p>يعتبر هذا القسم الأهم في دورة حياة النظام. توزيع الأرباح لا يتم تلقائياً بإرسال الأموال، بل يجب التدخل البشري لاعتماد الصرف (سواءً نقدي من الخزنة أو تحويل بنكي).</p>
+
+                    <h4>ما هي آلية تسليم الأرباح للعميل؟</h4>
+                    <p>عندما يستحق العميل ربحاً (مثال: لديه وديعة بـ 1,000,000 وربحه الشهري المعتمد هو 5% أي 50,000)، يقوم صندوق الشركة بتسليم العميل المبلغ المحسوب. بعدها <strong>مباشرةً</strong> يجب على الموظف إثبات ذلك بالآتي:</p>
+                    <div class="step-box">
+                        <span class="step-num">1</span> بحث عن اسم العميل والدخول لملفه.<br>
+                        <span class="step-num">2</span> الضغط على <strong>إضافة معاملة / سحب أرباح</strong>.<br>
+                        <span class="step-num">3</span> <strong>النوع:</strong> اختر (ربح - Profit). <em>هذا خيار حساس جداً فلو تم اختيار إيداع سيزيد رأس ماله بالخطأ.</em><br>
+                        <span class="step-num">4</span> <strong>المبلغ:</strong> إدخال المبلغ الذي تم تسليمه للعميل.<br>
+                        <span class="step-num">5</span> <strong>العملة:</strong> التأكد من تحديد عملة الربح المسلم.<br>
+                        <span class="step-num">6</span> <strong>الملاحظات:</strong> من <u>الضروري جداً</u> كتابة الشهر الذي يغمره هذا الربح. مثال: <em>(أرباح شهر أبريل 2026 تم تسليمها نقداً)</em>.<br>
+                        <span class="step-num">7</span> الضغط على <strong>حفظ</strong>.
+                    </div>
+
+                    <div class="note-info">
+                        <strong>لماذا كتابة الملاحظات مهمة؟</strong><br>
+                        لأن المستثمر قد يأتي لاحقاً ويقول: (أنا لم أستلم أرباح شهر مارس!)، بالعودة لملفه وللتقارير ستظهر حركة (نوع المعاملة: ربح) والملاحظة المكتوبة (أرباح شهر مارس)، مع إيصال وتاريخ ووقت دقيق يثبت استلامه.
+                    </div>
+                </section>
+
+                <!-- Section 5 -->
+                <section id="withdrawals" class="content-section">
+                    <h2><i class="bi bi-bank me-2"></i> 5. سحب وإرجاع رأس المال (إنهاء الوديعة)</h2>
+                    <p>ماذا يحدث عندما تنتهي مدة الوديعة، أو يطلب المستثمر سحب نقوده بشكل مفاجئ وكسر العقد؟</p>
+                    
+                    <p>تتم العملية المحاسبية بخطوتين أساسيتين للتسوية وتصفية الذمة:</p>
+                    <ol>
+                        <li><strong>تسجيل حركة السحب المال:</strong> الدخول لمعاملات العميل -> إضافة معاملة -> النوع: <strong>(سحب - Withdraw)</strong> -> المبلغ الذي تم إرجاعه للعميل بالكامل. <br><em>ملاحظة المعاملة: "تم استرداد رأس المال كاملاً بناءً على طلب العميل".</em></li>
+                        <li><strong>إنهاء العقد من لوحة الودائع:</strong> الذهاب لقسم "الودائع"، الدخول إلى الوديعة النشطة الخاصة به، وتغيير حالتها من (نشطة) إلى <strong>(منتهية)</strong> إذا انتهت مدتها، أو <strong>(ملغاة)</strong> إذا تم كسرها قبل أوانها.</li>
+                    </ol>
+                    <div class="note-danger">
+                        حركة (السحب) تختلف كلياً عن طلب (الربح). السحب هو انسحاب لأصل رأس المال، بينما الربح هو الفائدة التشغيلية. يجب الانتباه للقوائم المنسدلة عند تسجيل الحركة.
+                    </div>
+                </section>
+
+                <!-- Section 6 -->
+                <section id="receipts" class="content-section">
+                    <h2><i class="bi bi-receipt me-2"></i> 6. الإيصالات والأرقام التسلسلية</h2>
+                    <p>يولد النظام رقم إيصال فريد لكل معاملة يتم حفظها تلقائياً. صيغة الإيصال هي <code>AG-YYYYMM-XXXX</code>.</p>
+                    <ul>
+                        <li><strong>AG:</strong> اختصار لمجموعة العسافي.</li>
+                        <li><strong>YYYYMM:</strong> السنة والشهر الحاليين لمعرفة توقيت المعاملة بسهولة (مثل 202604).</li>
+                        <li><strong>XXXX:</strong> رقم المعاملة التسلسلي الذي لا ينكسر ولا يعاد إصداره أبداً.</li>
+                    </ul>
+
+                    <h4>إذا طلب العميل طباعة الإيصال مرة أخرى؟</h4>
+                    <p>إذا فقد العميل ورقته ويريد كشفاً بالمعاملة المحددة، لا توجد مشكلة أبداً! فقط اذهب إلى صفحة <strong>التقارير</strong>، وقم بوضع رقم الإيصال في مستطيل <strong>"بحث برقم الإيصال"</strong> واضغط بحث وسيظهر لك الإيصال وحيداً لتطبعه فوراً (PDF) بكل بياناته.</p>
+                </section>
+
+                <!-- Section 7 -->
+                <section id="currencies" class="content-section">
+                    <h2><i class="bi bi-currency-exchange me-2"></i> 7. التعامل مع العملات</h2>
+                    <p>النظام يدعم تعدد العملات (الدينار العراقي IQD، والدولار الأمريكي USD، وغيرها). وذلك أمر جوهري لأن الخزنة فيها عملات مختلفة ولا يجوز دمج المعاملات.</p>
+                    
+                    <ul>
+                        <li>عند تسجيل الإيداع الأول للمستثمر، حدد العملة التي دفعها.</li>
+                        <li>إذا كانت الوديعة بالدولار، يجب أن يتم تسجيل دفع الأرباح بنفس العملة (الدولار) لضمان اتساق كشف الحساب.</li>
+                        <li>أي خطأ في كتابة العملة سيؤدي لظهور التقرير وكأن النظام يحمل مبالغ ضخمة بالدينار بينما هي في الواقع دولارات.</li>
+                    </ul>
+                </section>
+
+                <!-- Section 8 -->
+                <section id="reports" class="content-section">
+                    <h2><i class="bi bi-printer me-2"></i> 8. التقارير، الفلاتر، وتصدير الملفات</h2>
+                    <p>تم تصميم صفحة "التقارير" في النظام لتكون مركز العمليات الرقابية، وبها أربعة تبويبات أساسية:</p>
+
+                    <div class="table-responsive">
+                        <table class="table table-custom">
+                            <tr>
+                                <th>التبويبة</th>
+                                <th>فائدتها ومحتواها</th>
+                            </tr>
+                            <tr>
+                                <td><strong>الودائع</strong></td>
+                                <td>متابعة كل العقود. يمكن فلترتها كالتالي: (أرني كل الودائع "المنتهية" والتي كانت من النوع "القصير" للمستثمر "خالد").</td>
+                            </tr>
+                            <tr>
+                                <td><strong>الأرباح</strong></td>
+                                <td>تعرض حصراً المعاملات التي نوعها (ربح). مهم أخر كل شهر لطباعته وتقديمه للإدارة لمعرفة كم تم صرف أرباح هذا الشهر.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>كشف مستثمر</strong></td>
+                                <td>يولد لك وثيقة مالية كاملة وموثوقة (Statement)، فيها كل ما دفعه المستثمر وكل ما سحبه بالتواريخ، لفض أي نزاع مالي وحفظ الرصيد.</td>
+                            </tr>
+                            <tr>
+                                <td><strong>المعاملات</strong></td>
+                                <td>الصفحة العامة لتتبع كافة الحركات للبحث اليومي وللجرد العام للمحاسبة والمطابقة مع الصندوق الكاش.</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <h4>الإخراج والنتائج:</h4>
+                    <ul>
+                        <li>يتم تطبيق الفلاتر بالضغط على زر <strong>بحـث</strong>. إذا احتجت لإلغاء جميع الفلاتر، ببساطة اضغط <strong>مـسح</strong>.</li>
+                        <li><strong>زر التصدير (PDF / Excel):</strong> النظام مصمم بذكاء.. عند ضغطك لزر التصدير، سيقوم بأخذ **نفس الفلاتر المحددة حالياً** وتصديرها باسم واضح!</li>
+                        <li>مثال رائع: إذا كنت داخل التقرير، واخترت المستثمر "أحمد" وضغطت إكسيل، سينزل الملف لحاسوبك باسم <code>تقرير-المعاملات-أحمد.xlsx</code> وليس اسماً عشوائياً.</li>
+                    </ul>
+                </section>
+
+                <div class="text-center mt-5 mb-5 text-muted h6 border-top pt-4" style="border-color: var(--border) !important;">
+                    هذا الدليل معتمد في قسم اللوائح التقنية لمجموعة العسافي للإستثمار.<br>
+                    أي طلبات استرجاع بيانات أو تعديل نظامي تتم عبر التواصل مع مدير النظام الرئيسي (Admin).
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script للفهرس الديناميكي في الموبايل -->
+    <script>
+        const sections = document.querySelectorAll('section');
+        const navLinks = document.querySelectorAll('.sidebar a');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+<?php $page_title='Edit Shipment';require_once __DIR__.'/../includes/admin-header.php';$s=db()->prepare('SELECT * FROM shipments WHERE id=?');$s->execute([(int)($_GET['id']??0)]);$shipment=$s->fetch();if(!$shipment){http_response_code(404);exit('Shipment not found.');}require __DIR__.'/shipment-form.php';require __DIR__.'/../includes/admin-footer.php';
