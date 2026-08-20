@@ -24,8 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_deposit_id']
         setFlash('warning', 'عذراً، تم إرجاع رأس المال لهذه الوديعة مسبقاً.');
     } elseif ($dep['end_date'] > date('Y-m-d')) {
         setFlash('warning', 'لا يمكن إنهاء الوديعة قبل تاريخ استحقاقها.');
-    } elseif ((float) $dep['accumulated_profit'] > 0) {
-        setFlash('warning', 'الرجاء صرف الأرباح التراكمية المتبقية قبل إنهاء الوديعة.');
+    } elseif ((float) $dep['accumulated_profit'] > 0 || isDepositProfitDue($dep) || isDepositMonthlyProfitDue($dep)) {
+        setFlash('warning', 'عفواً، لا يمكن إنهاء الوديعة وإرجاع رأس المال حتى يتم صرف جميع أرباحها التراكمية والشهرية المستحقة أولاً.');
     } else {
         try {
             $pdo->beginTransaction();
@@ -235,12 +235,12 @@ include __DIR__ . '/../includes/header.php';
                                 $next = calcNextWithdrawalDate($d);
                                 $nextStr = $next ? $next->format('Y-m-d') : null;
                                 $hasProfit = $d['accumulated_profit'] > 0;
-                                // A deposit is 'due' if its next withdrawal date has arrived or passed
-                                $isDue = $nextStr && $nextStr <= date('Y-m-d');
+                                $isDue = isDepositProfitDue($d);
                                 $isMonthlyProfitDue = isDepositMonthlyProfitDue($d);
+                                $hasUndisbursedProfit = $hasProfit || $isDue || $isMonthlyProfitDue;
 
-                                $isReadyToClose = ($d['end_date'] <= date('Y-m-d') && !$hasProfit && $d['withdraw_count'] == 0) || ($d['status'] === 'completed' && $d['withdraw_count'] == 0);
-                                $isPendingClosure = $d['end_date'] <= date('Y-m-d') && $hasProfit && $d['withdraw_count'] == 0;
+                                $isReadyToClose = ($d['end_date'] <= date('Y-m-d') && !$hasUndisbursedProfit && $d['withdraw_count'] == 0) || ($d['status'] === 'completed' && !$hasUndisbursedProfit && $d['withdraw_count'] == 0);
+                                $isPendingClosure = ($d['end_date'] <= date('Y-m-d') || $d['status'] === 'completed') && $hasUndisbursedProfit && $d['withdraw_count'] == 0;
 
                                 $diffExpiry = null;
                                 if ($d['status'] === 'active' && $d['end_date']) {
