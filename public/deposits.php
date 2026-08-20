@@ -337,12 +337,45 @@ include __DIR__ . '/../includes/header.php';
                                                      </button>
                                                  <?php endif; ?>
 
-                                                 <a href="deposit_add.php?edit=<?= $d['id'] ?>"
-                                                     class="btn btn-sm btn-outline-gold" title="تعديل الوديعة">
-                                                     <i class="bi bi-pencil"></i>
-                                                 </a>
-                                             </div>
-                                         <?php endif; ?>
+                                                  <?php if ($isMonthlyProfitDue): ?>
+                                                      <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
+                                                          title="إضافة ربح شهري يتراكم في حافظة الوديعة">
+                                                          <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
+                                                      </a>
+                                                  <?php else: ?>
+                                                      <?php
+                                                      $nextP = calcNextProfitDate($d);
+                                                      $nextPStr = $nextP ? $nextP->format('Y-m-d') : null;
+                                                      ?>
+                                                      <button class="btn btn-sm btn-outline-secondary" disabled
+                                                          title="لا يمكن إضافة ربح شهري قبل حلول الذكرى الشهرية (تستحق بتاريخ: <?= formatDate($nextPStr) ?>)">
+                                                          <i class="bi bi-lock me-1"></i> ربح تراكمي
+                                                      </button>
+                                                  <?php endif; ?>
+
+                                                  <?php if ($isReadyToClose): ?>
+                                                      <form method="post" class="d-inline m-0"
+                                                          onsubmit="return confirm('هل أنت متأكد من إنهاء هذه الوديعة وإرجاع مبلغ رأس المال للمستثمر بصفة نهائية؟');">
+                                                          <?= csrfField() ?>
+                                                          <input type="hidden" name="complete_deposit_id" value="<?= $d['id'] ?>">
+                                                          <button type="submit" class="btn btn-sm btn-danger"
+                                                              title="إنهاء الوديعة وإرجاع رأس المال">
+                                                              <i class="bi bi-x-octagon"></i> إنهاء الوديعة
+                                                          </button>
+                                                      </form>
+                                                  <?php elseif ($isPendingClosure): ?>
+                                                      <button class="btn btn-sm btn-outline-danger" disabled
+                                                          title="انتهت مدة الوديعة. يجب صرف جميع أرباحها المستحقة التراكمية أو الشهرية أولاً ليمكن إغلاقها.">
+                                                          <i class="bi bi-x-octagon"></i> إنهاء الوديعة
+                                                      </button>
+                                                  <?php endif; ?>
+
+                                                  <a href="deposit_add.php?edit=<?= $d['id'] ?>"
+                                                      class="btn btn-sm btn-outline-gold" title="تعديل الوديعة">
+                                                      <i class="bi bi-pencil"></i>
+                                                  </a>
+                                              </div>
+                                          <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
