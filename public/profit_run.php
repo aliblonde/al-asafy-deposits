@@ -66,12 +66,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             continue;
         }
 
-        // Check if the withdrawal date has been reached
+        // Check if the withdrawal date has been reached or if accumulated profit exists
         $nextWithdrawal = calcNextWithdrawalDate($dep);
         $dueStr = $nextWithdrawal ? $nextWithdrawal->format('Y-m-d') : null;
+        $isDue = ($dueStr && $dueStr <= $today);
 
-        // STRICT RULE: No profit disbursement allowed before the due date under any circumstances
-        if (!$dueStr || $dueStr > $today) {
+        // Allow disbursement if it's due OR has accumulated profit OR staff requested manual single payout
+        if (!$isDue && $accumulated <= 0 && !$isManual) {
             $runErrors[] = "عفواً، لا يجوز صرف الأرباح للوديعة #{$dep['id']} قبل موعد استحقاقها القادم بتاريخ: " . formatDate($dueStr);
             $skipped++;
             continue;
