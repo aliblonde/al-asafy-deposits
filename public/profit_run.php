@@ -53,12 +53,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Read manual amount or custom note if it's a single deposit payout
     $manualAmount = isset($_POST['disburse_amount']) ? (float)$_POST['disburse_amount'] : null;
     $customNote = isset($_POST['note']) ? trim($_POST['note']) : '';
+    $manualCurrency = isset($_POST['currency']) && in_array($_POST['currency'], ['IQD', 'USD']) ? $_POST['currency'] : null;
 
     foreach ($activeDeposits as $dep) {
         $accumulated = (float) $dep['accumulated_profit'];
 
         $isManual = ($depositId && $manualAmount !== null);
         $amountToDisburse = $isManual ? $manualAmount : $accumulated;
+        $payoutCurrency = ($isManual && $manualCurrency) ? $manualCurrency : ($dep['currency'] ?? 'IQD');
         $note = $isManual ? ($customNote ?: 'صرف أرباح يدوية') : 'صرف أرباح تراكمية مستحقة';
 
         // Skip if no profit to disburse
@@ -101,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $dep['investor_id'],
                         $dep['id'],
                         $amountToDisburse,
-                        $dep['currency'] ?? 'IQD',
+                        $payoutCurrency,
                         $note
                     ]);
 
@@ -181,6 +183,53 @@ include __DIR__ . '/../includes/header.php';
                                 <?= csrfField() ?>
                                 
                                 <?php if ($targetDeposit): ?>
+                                    <div class="card bg-base border border-gold text-start mx-auto p-4 mb-4" style="max-width: 580px; border-radius: 12px;">
+                                        <h5 class="text-gold mb-3 border-bottom pb-2" style="font-weight: 700;">
+                                            <i class="bi bi-wallet2 me-2"></i>تفاصيل وعملة صرف أرباح الوديعة
+                                        </h5>
+                                        <div class="row g-3 mb-3">
+                                            <div class="col-6">
+                                                <span class="text-muted small d-block">المستثمر:</span>
+                                                <span class="fw-bold text-white"><?= htmlspecialchars($targetDeposit['full_name']) ?></span>
+                                            </div>
+                                            <div class="col-6">
+                                                <span class="text-muted small d-block">قيمة الوديعة الأصلية:</span>
+                                                <span class="fw-bold text-gold"><?= formatMoney($targetDeposit['amount'], $targetDeposit['currency']) ?></span>
+                                            </div>
+                                            <div class="col-6">
+                                                <span class="text-muted small d-block">الأرباح التراكمية بالحافظة:</span>
+                                                <span class="fw-bold text-success"><?= formatMoney($targetDeposit['accumulated_profit'], $targetDeposit['currency']) ?></span>
+                                            </div>
+                                            <div class="col-6">
+                                                <span class="text-muted small d-block">تاريخ الاستحقاق الحالي:</span>
+                                                <span class="text-white fw-bold"><?= formatDate(calcNextWithdrawalDate($targetDeposit)?->format('Y-m-d')) ?></span>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-3 mb-3">
+                                            <!-- Disburse Amount -->
+                                            <div class="col-md-7">
+                                                <label class="form-label text-gold fw-bold mb-1">مبلغ الصرف الفعلي:</label>
+                                                <input type="number" name="disburse_amount" class="form-control text-center fw-bold form-control-lg" step="0.01" min="0.01" 
+                                                       value="<?= htmlspecialchars((float)$targetDeposit['accumulated_profit'] > 0 ? (float)$targetDeposit['accumulated_profit'] : '') ?>" required placeholder="0.00">
+                                                <div class="form-text text-muted small mt-1">تأكيد الأرباح التراكمية أو إدخال مبلغ مخصص.</div>
+                                            </div>
+
+                                            <!-- Disburse Currency Selection -->
+                                            <div class="col-md-5">
+                                                <label class="form-label text-gold fw-bold mb-1">عملة التسليم / الصرف:</label>
+                                                <select name="currency" class="form-select form-select-lg bg-gold text-black fw-bold">
+                                                    <option value="USD" <?= ($targetDeposit['currency'] ?? 'USD') === 'USD' ? 'selected' : '' ?>>$ دولار (USD)</option>
+                                                    <option value="IQD" <?= ($targetDeposit['currency'] ?? 'USD') === 'IQD' ? 'selected' : '' ?>>د.ع دينار (IQD)</option>
+                                                </select>
+                                                <div class="form-text text-muted small mt-1">حدد عملة تسليم الأرباح.</div>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label class="form-label text-gold fw-bold mb-1">الملاحظة:</label>
+                                            <input type="text" name="note" class="form-control form-control-sm" value="صرف أرباح الوديعة المستحقة">
+                                        </div>
                                     </div>
                                 <?php endif; ?>
 

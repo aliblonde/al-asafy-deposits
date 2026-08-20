@@ -49,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $month = trim($_POST['month'] ?? '');
     $amount = (float)($_POST['amount'] ?? 0);
+    $currency = in_array($_POST['currency'] ?? '', ['IQD', 'USD']) ? $_POST['currency'] : ($deposit['currency'] ?? 'IQD');
     $note = trim($_POST['note'] ?? '');
 
     if (empty($month) || !preg_match('/^\d{4}-\d{2}$/', $month)) {
@@ -100,13 +101,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // 4. Log the action
                 logActivity($pdo, 'ADD_MANUAL_PROFIT', 'deposits', $depositId, null, [
                     'amount' => $amount,
-                    'currency' => $deposit['currency'],
+                    'currency' => $currency,
                     'month' => $month,
                     'anniversary_date' => $anniversaryDate,
                     'note' => $note ?: "إضافة ربح تراكمي يدوي لشهر $month"
                 ]);
 
-                setFlash('success', "تم إضافة ربح يدوي بقيمة " . formatMoney($amount, $deposit['currency']) . " للوديعة #{$depositId} بنجاح وتراكمها للتسليم.");
+                setFlash('success', "تم إضافة ربح يدوي بقيمة " . formatMoney($amount, $currency) . " للوديعة #{$depositId} بنجاح وتراكمها للتسليم.");
                 header('Location: deposits.php');
                 exit;
 
@@ -187,14 +188,17 @@ include __DIR__ . '/../includes/header.php';
                                     <div class="form-text text-muted small mt-1">يُقترح تلقائياً الشهر المستحق القادم للوديعة.</div>
                                 </div>
 
-                                <!-- Profit Amount -->
+                                <!-- Profit Amount & Currency -->
                                 <div class="col-md-6">
-                                    <label class="form-label text-white">قيمة ربح هذا الشهر <span class="text-danger">*</span></label>
+                                    <label class="form-label text-white">قيمة ربح هذا الشهر والعملة <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <input type="number" name="amount" class="form-control fw-bold" step="0.01" min="0.01" required placeholder="0.00">
-                                        <span class="input-group-text bg-gold text-black fw-bold"><?= currencySymbol($deposit['currency']) ?></span>
+                                        <select name="currency" class="form-select bg-gold text-black fw-bold" style="max-width: 115px;">
+                                            <option value="USD" <?= ($deposit['currency'] ?? 'USD') === 'USD' ? 'selected' : '' ?>>$ USD</option>
+                                            <option value="IQD" <?= ($deposit['currency'] ?? 'USD') === 'IQD' ? 'selected' : '' ?>>د.ع IQD</option>
+                                        </select>
                                     </div>
-                                    <div class="form-text text-muted small mt-1">أدخل القيمة يدوياً ليتم تراكمها في حافظة الوديعة.</div>
+                                    <div class="form-text text-muted small mt-1">حدد المبلغ والعملة (دولار $ أم دينار د.ع) لتراكمها بالحساب.</div>
                                 </div>
 
                                 <!-- Note -->
