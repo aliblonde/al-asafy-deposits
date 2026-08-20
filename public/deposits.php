@@ -323,8 +323,8 @@ include __DIR__ . '/../includes/header.php';
                                             <?= arabicStatus($d['status']) ?>
                                         </span></td>
                                     <td>
-                                        <?php if ($d['status'] === 'active' || ($d['status'] === 'completed' && $d['withdraw_count'] == 0)): ?>
-                                             <div class="d-flex flex-wrap gap-1 align-items-center">
+                                         <div class="d-flex flex-wrap gap-1 align-items-center">
+                                             <?php if ($d['status'] === 'active'): ?>
                                                  <?php if ($isDue): ?>
                                                      <a href="profit_run.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-gold fw-bold px-3"
                                                          title="صرف الأرباح (تراكمية أو مبلغ يدوي مخصص)">
@@ -334,41 +334,6 @@ include __DIR__ . '/../includes/header.php';
                                                      <button class="btn btn-sm btn-outline-secondary" disabled
                                                          title="غير مستحقة للصرف بعد (تستحق بتاريخ: <?= formatDate($nextStr) ?>)">
                                                          <i class="bi bi-lock me-1"></i> غير مستحقة
-                                                     </button>
-                                                 <?php endif; ?>
-
-                                                 <?php if ($d['status'] === 'active'): ?>
-                                                      <?php if ($isMonthlyProfitDue): ?>
-                                                          <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
-                                                              title="إضافة ربح شهري يتراكم في حافظة الوديعة">
-                                                              <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
-                                                          </a>
-                                                      <?php else: ?>
-                                                          <?php
-                                                          $nextP = calcNextProfitDate($d);
-                                                          $nextPStr = $nextP ? $nextP->format('Y-m-d') : null;
-                                                          ?>
-                                                          <button class="btn btn-sm btn-outline-secondary" disabled
-                                                              title="لا يمكن إضافة ربح شهري تراكمي قبل حلول الذكرى الشهرية (تستحق بتاريخ: <?= formatDate($nextPStr) ?>)">
-                                                              <i class="bi bi-lock me-1"></i> ربح تراكمي
-                                                          </button>
-                                                      <?php endif; ?>
-                                                 <?php endif; ?>
-
-                                                 <?php if ($isReadyToClose): ?>
-                                                     <form method="post" class="d-inline m-0"
-                                                         onsubmit="return confirm('هل أنت متأكد من إنهاء هذه الوديعة وإرجاع مبلغ رأس المال للمستثمر بصفة نهائية؟');">
-                                                         <?= csrfField() ?>
-                                                         <input type="hidden" name="complete_deposit_id" value="<?= $d['id'] ?>">
-                                                         <button type="submit" class="btn btn-sm btn-danger"
-                                                             title="إنهاء الوديعة وإرجاع رأس المال">
-                                                             <i class="bi bi-x-octagon"></i> إنهاء
-                                                         </button>
-                                                     </form>
-                                                 <?php elseif ($isPendingClosure): ?>
-                                                     <button class="btn btn-sm btn-outline-danger" disabled
-                                                         title="انتهت مدة الوديعة. يجب صرف أرباحها أولاً ليمكن إغلاقها.">
-                                                         <i class="bi bi-x-octagon"></i> إنهاء
                                                      </button>
                                                  <?php endif; ?>
 

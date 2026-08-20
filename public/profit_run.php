@@ -95,12 +95,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $note
             ]);
 
-            // 2. Update accumulated_profit and last_withdrawal_date
-            $useDueDate = ($dueStr && $dueStr <= $today) ? $dueStr : $today;
+            // 2. Update accumulated_profit and last_withdrawal_date to today to advance cycle to future
             $newAccumulated = max(0.00, $accumulated - $amountToDisburse);
 
             $pdo->prepare("UPDATE deposits SET accumulated_profit = ?, last_withdrawal_date = ? WHERE id = ?")
-                ->execute([$newAccumulated, $useDueDate, $dep['id']]);
+                ->execute([$newAccumulated, $today, $dep['id']]);
 
             $pdo->commit();
 

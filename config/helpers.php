@@ -67,6 +67,15 @@ function calcNextWithdrawalDate(array $deposit): ?DateTimeImmutable
  */
 function isDepositProfitDue(array $deposit, ?string $targetDate = null): bool
 {
+    // Expired or completed deposits with zero accumulated profit are NOT due for profit payout
+    $isExpired = isset($deposit['end_date']) && $deposit['end_date'] <= date('Y-m-d');
+    $isCompleted = ($deposit['status'] ?? '') === 'completed';
+    $accumulated = (float)($deposit['accumulated_profit'] ?? 0);
+
+    if (($isExpired || $isCompleted) && $accumulated <= 0) {
+        return false;
+    }
+
     $dueDate = calcNextWithdrawalDate($deposit);
     if (!$dueDate) {
         return false;
@@ -80,6 +89,14 @@ function isDepositProfitDue(array $deposit, ?string $targetDate = null): bool
  */
 function isDepositMonthlyProfitDue(array $deposit, ?string $targetDate = null): bool
 {
+    // Expired or completed deposits cannot accumulate new monthly profit
+    $isExpired = isset($deposit['end_date']) && $deposit['end_date'] <= date('Y-m-d');
+    $isCompleted = ($deposit['status'] ?? '') === 'completed';
+
+    if ($isExpired || $isCompleted) {
+        return false;
+    }
+
     $nextProfit = calcNextProfitDate($deposit);
     if (!$nextProfit) {
         return false;
