@@ -337,20 +337,22 @@ include __DIR__ . '/../includes/header.php';
                                                      </button>
                                                  <?php endif; ?>
 
-                                                  <?php if ($isMonthlyProfitDue): ?>
-                                                      <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
-                                                          title="إضافة ربح شهري يتراكم في حافظة الوديعة">
-                                                          <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
-                                                      </a>
-                                                  <?php else: ?>
-                                                      <?php
-                                                      $nextP = calcNextProfitDate($d);
-                                                      $nextPStr = $nextP ? $nextP->format('Y-m-d') : null;
-                                                      ?>
-                                                      <button class="btn btn-sm btn-outline-secondary" disabled
-                                                          title="لا يمكن إضافة ربح شهري قبل حلول الذكرى الشهرية (تستحق بتاريخ: <?= formatDate($nextPStr) ?>)">
-                                                          <i class="bi bi-lock me-1"></i> ربح تراكمي
-                                                      </button>
+                                                  <?php if ((int) $d['profit_payout_frequency'] > 1): ?>
+                                                      <?php if ($isMonthlyProfitDue): ?>
+                                                          <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
+                                                              title="إضافة ربح شهري يتراكم في حافظة الوديعة">
+                                                              <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
+                                                          </a>
+                                                      <?php else: ?>
+                                                          <?php
+                                                          $nextP = calcNextProfitDate($d);
+                                                          $nextPStr = $nextP ? $nextP->format('Y-m-d') : null;
+                                                          ?>
+                                                          <button class="btn btn-sm btn-outline-secondary" disabled
+                                                              title="لا يمكن إضافة ربح شهري قبل حلول الذكرى الشهرية (تستحق بتاريخ: <?= formatDate($nextPStr) ?>)">
+                                                              <i class="bi bi-lock me-1"></i> ربح تراكمي
+                                                          </button>
+                                                      <?php endif; ?>
                                                   <?php endif; ?>
 
                                                   <?php if ($isReadyToClose): ?>
