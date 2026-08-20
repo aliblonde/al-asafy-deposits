@@ -39,7 +39,17 @@ function calcNextProfitDate(array $deposit): ?DateTimeImmutable
     if (!$dt)
         return null;
 
-    return $dt->modify('+1 month');
+    $next = $dt->modify('+1 month');
+
+    // STRICT RULE: No profit cycles calculated after deposit end_date
+    if (isset($deposit['end_date']) && $deposit['end_date']) {
+        $endDt = DateTimeImmutable::createFromFormat('Y-m-d', $deposit['end_date']);
+        if ($endDt && $next > $endDt) {
+            return null; // Deposit contract term has ended!
+        }
+    }
+
+    return $next;
 }
 
 /**
@@ -59,7 +69,24 @@ function calcNextWithdrawalDate(array $deposit): ?DateTimeImmutable
     if (!$dt)
         return null;
 
-    return $dt->modify('+' . $freq . ' month');
+    // If already withdrawn up to or past end_date, no further withdrawal cycles exist!
+    if (isset($deposit['end_date']) && $deposit['end_date'] && $base) {
+        if ($base >= $deposit['end_date']) {
+            return null;
+        }
+    }
+
+    $next = $dt->modify('+' . $freq . ' month');
+
+    // Cap final withdrawal due date at deposit end_date
+    if (isset($deposit['end_date']) && $deposit['end_date']) {
+        $endDt = DateTimeImmutable::createFromFormat('Y-m-d', $deposit['end_date']);
+        if ($endDt && $next > $endDt) {
+            return $endDt;
+        }
+    }
+
+    return $next;
 }
 
 /**
