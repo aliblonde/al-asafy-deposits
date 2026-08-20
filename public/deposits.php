@@ -325,7 +325,7 @@ include __DIR__ . '/../includes/header.php';
                                     <td>
                                          <div class="d-flex flex-wrap gap-1 align-items-center">
                                              <?php if ($d['status'] === 'active'): ?>
-                                                 <?php if ($isDue || $hasProfit): ?>
+                                                 <?php if ($isDue): ?>
                                                      <a href="profit_run.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-gold fw-bold px-3"
                                                          title="صرف الأرباح (تراكمية أو مبلغ يدوي مخصص)">
                                                          <i class="bi bi-wallet2 me-1"></i> صرف الأرباح
