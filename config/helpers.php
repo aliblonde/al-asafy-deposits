@@ -1,6 +1,8 @@
 <?php
 // config/helpers.php — Utility functions
 
+date_default_timezone_set('Asia/Baghdad');
+
 /**
  * Generate a unique receipt number: AG-YYYYMM-XXXXXX
  * Must be called INSIDE an open DB transaction.

@@ -1,6 +1,8 @@
 <?php
 // config/db.php — PDO connection
 
+date_default_timezone_set('Asia/Baghdad');
+
 $isLocal = (php_sapi_name() === 'cli' || str_contains($_SERVER['HTTP_HOST'] ?? '', 'localhost') || str_contains($_SERVER['HTTP_HOST'] ?? '', '127.0.0.1'));
 
 if ($isLocal) {
