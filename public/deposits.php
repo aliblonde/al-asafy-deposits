@@ -237,6 +237,7 @@ include __DIR__ . '/../includes/header.php';
                                 $hasProfit = $d['accumulated_profit'] > 0;
                                 // A deposit is 'due' if its next withdrawal date has arrived or passed
                                 $isDue = $nextStr && $nextStr <= date('Y-m-d');
+                                $isMonthlyProfitDue = isDepositMonthlyProfitDue($d);
 
                                 $isReadyToClose = ($d['end_date'] <= date('Y-m-d') && !$hasProfit && $d['withdraw_count'] == 0) || ($d['status'] === 'completed' && $d['withdraw_count'] == 0);
                                 $isPendingClosure = $d['end_date'] <= date('Y-m-d') && $hasProfit && $d['withdraw_count'] == 0;
@@ -337,10 +338,21 @@ include __DIR__ . '/../includes/header.php';
                                                  <?php endif; ?>
 
                                                  <?php if ($d['status'] === 'active'): ?>
-                                                      <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
-                                                          title="إضافة ربح شهري يتراكم في حافظة الوديعة">
-                                                          <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
-                                                      </a>
+                                                      <?php if ($isMonthlyProfitDue): ?>
+                                                          <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
+                                                              title="إضافة ربح شهري يتراكم في حافظة الوديعة">
+                                                              <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
+                                                          </a>
+                                                      <?php else: ?>
+                                                          <?php
+                                                          $nextP = calcNextProfitDate($d);
+                                                          $nextPStr = $nextP ? $nextP->format('Y-m-d') : null;
+                                                          ?>
+                                                          <button class="btn btn-sm btn-outline-secondary" disabled
+                                                              title="لا يمكن إضافة ربح شهري تراكمي قبل حلول الذكرى الشهرية (تستحق بتاريخ: <?= formatDate($nextPStr) ?>)">
+                                                              <i class="bi bi-lock me-1"></i> ربح تراكمي
+                                                          </button>
+                                                      <?php endif; ?>
                                                  <?php endif; ?>
 
                                                  <?php if ($isReadyToClose): ?>

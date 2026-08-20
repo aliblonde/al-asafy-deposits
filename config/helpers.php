@@ -75,6 +75,19 @@ function isDepositProfitDue(array $deposit, ?string $targetDate = null): bool
     return $dueDate->format('Y-m-d') <= $checkDate;
 }
 
+/**
+ * Check if the deposit's next monthly profit anniversary has arrived.
+ */
+function isDepositMonthlyProfitDue(array $deposit, ?string $targetDate = null): bool
+{
+    $nextProfit = calcNextProfitDate($deposit);
+    if (!$nextProfit) {
+        return false;
+    }
+    $checkDate = $targetDate ?: date('Y-m-d');
+    return $nextProfit->format('Y-m-d') <= $checkDate;
+}
+
 
 /** Format amount with currency symbol */
 function formatMoney(string|float|null $amount, string $currency = 'IQD'): string

@@ -32,6 +32,15 @@ if (!$deposit) {
 }
 
 $nextProfitDate = calcNextProfitDate($deposit);
+$nextProfitStr = $nextProfitDate ? $nextProfitDate->format('Y-m-d') : null;
+
+// STRICT RULE: Cannot add manual cumulative profit before monthly profit due date
+if (!$nextProfitStr || $nextProfitStr > date('Y-m-d')) {
+    setFlash('danger', 'عفواً، لا يجوز إضافة ربح تراكمي شهري لهذه الوديعة قبل حلول موعد استحقاق شهرها القادم بتاريخ: ' . formatDate($nextProfitStr));
+    header('Location: deposits.php');
+    exit;
+}
+
 $defaultMonth = $nextProfitDate ? $nextProfitDate->format('Y-m') : date('Y-m');
 
 $errors = [];
