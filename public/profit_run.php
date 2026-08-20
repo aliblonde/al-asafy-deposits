@@ -142,7 +142,7 @@ if (!$depositId) {
          FROM deposits d
          JOIN investors i ON i.id = d.investor_id
          JOIN deposit_types dt ON dt.id = d.deposit_type_id
-         WHERE d.status IN ('active', 'completed')
+         WHERE d.status = 'active' OR (d.status = 'completed' AND d.accumulated_profit > 0)
          ORDER BY d.created_at DESC"
     )->fetchAll();
 
