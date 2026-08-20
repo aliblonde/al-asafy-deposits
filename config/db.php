@@ -1,11 +1,21 @@
 <?php
 // config/db.php — PDO connection
 
-define('DB_HOST', '127.0.0.1');
-define('DB_NAME', 'alasisfh_al_asafy_deposits');
-define('DB_USER', 'alasisfh_alasafy');
-define('DB_PASS', 'Alasafy@Treandy2026');
-define('DB_CHARSET', 'utf8mb4');
+$isLocal = (php_sapi_name() === 'cli' || str_contains($_SERVER['HTTP_HOST'] ?? '', 'localhost') || str_contains($_SERVER['HTTP_HOST'] ?? '', '127.0.0.1'));
+
+if ($isLocal) {
+    define('DB_HOST', '127.0.0.1');
+    define('DB_NAME', 'al_asafy_deposits');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+    define('DB_CHARSET', 'utf8mb4');
+} else {
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'alasisfh_al_asafy_deposits');
+    define('DB_USER', 'alasisfh_alasafy');
+    define('DB_PASS', 'Alasafy@Treandy2026');
+    define('DB_CHARSET', 'utf8mb4');
+}
 
 function getPDO(): PDO {
     static $pdo = null;

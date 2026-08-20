@@ -34,6 +34,7 @@ function sidebarLink(string $href, string $icon, string $label, string $current)
         <?php if (currentRole() === 'admin'): ?>
             <?= sidebarLink('/activity_logs.php', 'clock-history', 'سجل العمليات', $currentPage) ?>
             <?= sidebarLink('/users.php', 'person-badge', 'إدارة الموظفين', $currentPage) ?>
+            <?= sidebarLink('/admin_seed_test_data.php', 'database-fill-gear', 'تفريغ وتعبئة الاختبار', $currentPage) ?>
         <?php endif; ?>
 
         <div class="nav-section-label mt-3">الحساب</div>
