@@ -39,6 +39,11 @@ function sidebarLink(string $href, string $icon, string $label, string $current)
 
         <div class="nav-section-label mt-3">الحساب</div>
         <?= sidebarLink('change_password.php', 'shield-lock', 'تغيير كلمة المرور', $currentPage) ?>
-        <?= sidebarLink('logout.php', 'box-arrow-left', 'تسجيل الخروج', $currentPage) ?>
+        <form method="POST" action="logout.php" class="sidebar-link-form m-0 p-0">
+            <?= csrfField() ?>
+            <button type="submit" class="sidebar-link w-100 border-0 text-start bg-transparent">
+                <i class="bi bi-box-arrow-left"></i> <span>تسجيل الخروج</span>
+            </button>
+        </form>
     </div>
 </nav>

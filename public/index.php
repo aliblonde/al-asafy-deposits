@@ -20,36 +20,71 @@ header("Expires: 0");
 
 $error = '';
 
-if (!isset($_SESSION['login_attempts'])) {
-    $_SESSION['login_attempts'] = 0;
-    $_SESSION['last_attempt_time'] = time();
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     
-    // Check Rate Limiting (Block if > 5 failed attempts in 15 minutes)
-    if ($_SESSION['login_attempts'] >= 5 && (time() - $_SESSION['last_attempt_time']) < 900) {
-        $remaining = ceil((900 - (time() - $_SESSION['last_attempt_time'])) / 60);
-        $error = "عفواً، تم تجاوز عدد محاولات الدخول المسموح بها. يرجى الانتظار لمدة {$remaining} دقيقة قبل المحاولة مجدداً.";
-    } else {
-        $username = trim($_POST['username'] ?? '');
-        $password = $_POST['password'] ?? '';
-        $role_sel = $_POST['role'] ?? '';
+    $pdo = getPDO();
+    $rawUsername = trim($_POST['username'] ?? '');
+    $normUsername = mb_strtolower($rawUsername);
+    $password = $_POST['password'] ?? '';
+    $role_sel = $_POST['role'] ?? '';
 
-        if ($username && $password) {
-            $pdo = getPDO();
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? AND role = ? LIMIT 1");
-            $stmt->execute([$username, $role_sel]);
+    // Privacy-conscious IP hashing using REMOTE_ADDR
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    $secret = getenv('RATE_LIMIT_SECRET') ?: 'alasafy_rate_limit_secret_salt_2026';
+    $ipHash = hash_hmac('sha256', $ip, $secret);
+
+    // Helper functions for persistent rate limiting
+    $isRateLimited = function(PDO $db, string $hash, string $uname): bool {
+        try {
+            $stmt = $db->prepare("
+                SELECT COUNT(*) FROM login_attempts 
+                WHERE (ip_address = ? OR username = ?) 
+                  AND success = 0 
+                  AND attempted_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+            ");
+            $stmt->execute([$hash, $uname]);
+            return ((int)$stmt->fetchColumn()) >= 5;
+        } catch (Exception $e) {
+            error_log("Rate limit query notice: " . $e->getMessage());
+            return false;
+        }
+    };
+
+    $recordAttempt = function(PDO $db, string $hash, string $uname, bool $success): void {
+        try {
+            $stmt = $db->prepare("INSERT INTO login_attempts (ip_address, username, attempted_at, success) VALUES (?, ?, NOW(), ?)");
+            $stmt->execute([$hash, $uname, $success ? 1 : 0]);
+            if ($success) {
+                $del = $db->prepare("DELETE FROM login_attempts WHERE (ip_address = ? OR username = ?) AND success = 0");
+                $del->execute([$hash, $uname]);
+            }
+            if (rand(1, 20) === 1) {
+                $db->query("DELETE FROM login_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL 1 DAY)");
+            }
+        } catch (Exception $e) {
+            error_log("Record attempt notice: " . $e->getMessage());
+        }
+    };
+
+    if ($normUsername !== '' && $isRateLimited($pdo, $ipHash, $normUsername)) {
+        $error = "عفواً، تم تجاوز عدد محاولات الدخول المسموح بها. يرجى الانتظار لمدة 15 دقيقة قبل المحاولة مجدداً.";
+    } else {
+        if ($rawUsername !== '' && $password !== '') {
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? LIMIT 1");
+            $stmt->execute([$rawUsername]);
             $user = $stmt->fetch();
 
-            if ($user && password_verify($password, $user['password_hash'])) {
+            // Verify password AND verify that database role matches requested role
+            if ($user && $user['role'] === $role_sel && password_verify($password, $user['password_hash'])) {
+                $recordAttempt($pdo, $ipHash, $normUsername, true);
+
                 session_regenerate_id(true);
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['role'] = $user['role'];
                 $_SESSION['investor_id'] = $user['investor_id'];
-                $_SESSION['login_attempts'] = 0;
+                $_SESSION['last_activity'] = time();
 
                 // Update last_login_at
                 $pdo->prepare("UPDATE users SET last_login_at=NOW() WHERE id=?")->execute([$user['id']]);
@@ -58,9 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: ' . ($user['role'] === 'investor' ? 'investor_portal.php' : 'dashboard.php'));
                 exit;
             } else {
-                $_SESSION['login_attempts']++;
-                $_SESSION['last_attempt_time'] = time();
-                $error = 'اسم المستخدم أو كلمة المرور غير صحيحة، أو الدور المحدد لا يطابق حسابك.';
+                $recordAttempt($pdo, $ipHash, $normUsername, false);
+                $error = 'اسم المستخدم أو كلمة المرور غير صحيحة، أو الحساب غير متاح حالياً.';
             }
         } else {
             $error = 'يرجى إدخال اسم المستخدم وكلمة المرور.';
