@@ -1,5 +1,6 @@
 <?php
 // includes/sidebar.php
+require_once __DIR__ . '/../config/csrf.php';
 $currentPage = basename($_SERVER['PHP_SELF']);
 function sidebarLink(string $href, string $icon, string $label, string $current): string
 {
@@ -34,7 +35,12 @@ function sidebarLink(string $href, string $icon, string $label, string $current)
         <?php if (currentRole() === 'admin'): ?>
             <?= sidebarLink('activity_logs.php', 'clock-history', 'سجل العمليات', $currentPage) ?>
             <?= sidebarLink('users.php', 'person-badge', 'إدارة الموظفين', $currentPage) ?>
-            <?= sidebarLink('admin_seed_test_data.php', 'database-fill-gear', 'تفريغ وتعبئة الاختبار', $currentPage) ?>
+            <?php 
+            $appEnv = strtolower(trim(getenv('APP_ENV') ?: ($_ENV['APP_ENV'] ?? 'production')));
+            if (in_array($appEnv, ['development', 'local', 'testing'], true)): 
+            ?>
+                <?= sidebarLink('admin_seed_test_data.php', 'database-fill-gear', 'تفريغ وتعبئة الاختبار', $currentPage) ?>
+            <?php endif; ?>
         <?php endif; ?>
 
         <div class="nav-section-label mt-3">الحساب</div>

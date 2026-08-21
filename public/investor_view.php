@@ -25,8 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $newPwd = $_POST['new_password'] ?? '';
         $confirmPwd = $_POST['confirm_password'] ?? '';
         
-        if (strlen($newPwd) < 6) {
-            setFlash('danger', 'كلمة المرور الجديدة يجب أن تكون 6 خانات على الأقل.');
+        $passCheck = validatePasswordPolicy($newPwd);
+        if (!$passCheck['valid']) {
+            setFlash('danger', $passCheck['error']);
         } elseif ($newPwd !== $confirmPwd) {
             setFlash('danger', 'كلمتا المرور غير متطابقتين.');
         } else {
@@ -259,11 +260,11 @@ include __DIR__ . '/../includes/header.php';
                                         <input type="hidden" name="action" value="reset_password">
                                         <div class="mb-2">
                                             <label class="form-label small text-muted">كلمة المرور الجديدة</label>
-                                            <input type="password" name="new_password" class="form-control form-control-sm" required minlength="6" placeholder="6 خانات على الأقل">
+                                            <input type="password" name="new_password" class="form-control form-control-sm" required minlength="10" placeholder="10 خانات على الأقل">
                                         </div>
                                         <div class="mb-2">
                                             <label class="form-label small text-muted">تأكيد كلمة المرور</label>
-                                            <input type="password" name="confirm_password" class="form-control form-control-sm" required minlength="6" placeholder="أعد إدخال كلمة المرور">
+                                            <input type="password" name="confirm_password" class="form-control form-control-sm" required minlength="10" placeholder="أعد إدخال كلمة المرور">
                                         </div>
                                         <button type="submit" class="btn btn-sm btn-warning w-100 mt-2">
                                             <i class="bi bi-check-circle me-1"></i> حفظ كلمة المرور

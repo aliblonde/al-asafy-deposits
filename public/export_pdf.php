@@ -8,69 +8,89 @@ require_once __DIR__ . '/../config/logger.php';
 requireLogin();
 $pdo = getPDO();
 
+$userRole = currentRole();
+if (!in_array($userRole, ['admin', 'staff', 'investor'], true)) {
+    http_response_code(403);
+    die('<div style="font-family:sans-serif;color:#c00;padding:30px;text-align:center;direction:rtl"><h2>403 — غير مصرح</h2><p>ليس لديك صلاحية للوصول إلى هذا التقرير.</p></div>');
+}
+
 $report = $_GET['report'] ?? 'investor_statement';
 $investorId = (int) ($_GET['investor_id'] ?? 0);
-if (currentRole() === 'investor') {
+if ($userRole === 'investor') {
     $investorId = (int) currentInvestorId();
+    if ($investorId <= 0) {
+        http_response_code(403);
+        die('<div style="font-family:sans-serif;color:#c00;padding:30px;text-align:center;direction:rtl"><h2>403 — غير مصرح</h2><p>حساب المستثمر غير معروف.</p></div>');
+    }
 }
+
 $dateFrom = $_GET['date_from'] ?? '';
 $dateTo = $_GET['date_to'] ?? '';
 $receiptNo = trim($_GET['receipt_no'] ?? '');
-
 
 // ── Fetch Data ─────────────────────────────────────────────
 $rows = [];
 $title = 'تقرير';
 $fTxType = $_GET['tx_type'] ?? '';
 
-if ($receiptNo) {
-    $stmt = $pdo->prepare("SELECT t.*, i.full_name FROM transactions t JOIN investors i ON i.id=t.investor_id WHERE t.receipt_no LIKE ?");
-    $stmt->execute(['%' . $receiptNo . '%']);
+if ($receiptNo !== '') {
+    if ($userRole === 'investor') {
+        $stmt = $pdo->prepare("SELECT t.*, i.full_name FROM transactions t JOIN investors i ON i.id=t.investor_id WHERE t.receipt_no = ? AND t.investor_id = ? LIMIT 1");
+        $stmt->execute([$receiptNo, $investorId]);
+    } else {
+        $stmt = $pdo->prepare("SELECT t.*, i.full_name FROM transactions t JOIN investors i ON i.id=t.investor_id WHERE t.receipt_no LIKE ?");
+        $stmt->execute(['%' . $receiptNo . '%']);
+    }
     $rows = $stmt->fetchAll();
+    
+    if (empty($rows) && $userRole === 'investor') {
+        http_response_code(404);
+        die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>404 — الإيصال غير موجود</h2><p>لم يتم العثور على الإيصال المطلوب.</p></div>');
+    }
+    
     $title = 'إيصال ' . $receiptNo;
     if (!empty($rows)) {
         $title = 'إيصال ' . $rows[0]['receipt_no'] . ' - ' . $rows[0]['full_name'];
     }
 } elseif ($report === 'investor_statement') {
     $where = ['1=1']; $params = [];
-    if ($investorId) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
+    if ($userRole === 'investor' || $investorId > 0) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
     if ($dateFrom) { $where[] = 't.date>=?'; $params[] = $dateFrom . ' 00:00:00'; }
     if ($dateTo) { $where[] = 't.date<=?'; $params[] = $dateTo . ' 23:59:59'; }
     $stmt = $pdo->prepare("SELECT t.*, i.full_name FROM transactions t JOIN investors i ON i.id=t.investor_id WHERE " . implode(' AND ', $where) . " ORDER BY t.date DESC");
     $stmt->execute($params); $rows = $stmt->fetchAll();
     $title = 'كشف حساب عام';
-    if (!empty($rows) && $investorId) { $title = 'كشف حساب - ' . $rows[0]['full_name']; }
+    if (!empty($rows) && $investorId > 0) { $title = 'كشف حساب - ' . $rows[0]['full_name']; }
 
 } elseif ($report === 'profits') {
     $where = ["t.type='profit'"]; $params = [];
+    if ($userRole === 'investor' || $investorId > 0) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
     if ($dateFrom) { $where[] = 't.date>=?'; $params[] = $dateFrom . ' 00:00:00'; }
     if ($dateTo) { $where[] = 't.date<=?'; $params[] = $dateTo . ' 23:59:59'; }
-    if ($investorId) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
     $stmt = $pdo->prepare("SELECT t.*, i.full_name FROM transactions t JOIN investors i ON i.id=t.investor_id WHERE " . implode(' AND ', $where) . " ORDER BY t.date DESC");
     $stmt->execute($params); $rows = $stmt->fetchAll();
-    
-    // إضافة الاسم ديناميكياً
     $title = 'تقرير الأرباح العام';
-    if (!empty($rows) && $investorId) { $title = 'تقرير الأرباح - ' . $rows[0]['full_name']; }
+    if (!empty($rows) && $investorId > 0) { $title = 'تقرير الأرباح - ' . $rows[0]['full_name']; }
 
 } elseif ($report === 'transactions') {
     $where = ['1=1']; $params = [];
     if ($fTxType) { $where[] = 't.type=?'; $params[] = $fTxType; }
+    if ($userRole === 'investor' || $investorId > 0) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
     if ($dateFrom) { $where[] = 't.date>=?'; $params[] = $dateFrom . ' 00:00:00'; }
     if ($dateTo) { $where[] = 't.date<=?'; $params[] = $dateTo . ' 23:59:59'; }
-    if ($investorId) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
     $stmt = $pdo->prepare("SELECT t.*, i.full_name FROM transactions t JOIN investors i ON i.id=t.investor_id WHERE " . implode(' AND ', $where) . " ORDER BY t.date DESC");
     $stmt->execute($params); $rows = $stmt->fetchAll();
-    
-    // إضافة الاسم ديناميكياً
     $title = 'تقرير المعاملات العام';
-    if (!empty($rows) && $investorId) { $title = 'تقرير المعاملات - ' . $rows[0]['full_name']; }
+    if (!empty($rows) && $investorId > 0) { $title = 'تقرير المعاملات - ' . $rows[0]['full_name']; }
 
 } elseif ($report === 'deposits') {
-    $stmt = $pdo->prepare("SELECT d.*, i.full_name, dt.name_ar FROM deposits d JOIN investors i ON i.id=d.investor_id JOIN deposit_types dt ON dt.id=d.deposit_type_id WHERE 1=1 ORDER BY d.created_at DESC");
-    $stmt->execute();
+    $where = ['1=1']; $params = [];
+    if ($userRole === 'investor' || $investorId > 0) { $where[] = 'd.investor_id=?'; $params[] = $investorId; }
+    $stmt = $pdo->prepare("SELECT d.*, i.full_name, dt.name_ar FROM deposits d JOIN investors i ON i.id=d.investor_id JOIN deposit_types dt ON dt.id=d.deposit_type_id WHERE " . implode(' AND ', $where) . " ORDER BY d.created_at DESC");
+    $stmt->execute($params);
     $rows = $stmt->fetchAll();
     $title = 'تقرير الودائع';
+    if (!empty($rows) && $investorId > 0) { $title = 'تقرير الودائع - ' . $rows[0]['full_name']; }
 }
 
 logActivity($pdo, 'EXPORT_PDF', 'reports', null, null, ['report' => $report, 'rows' => count($rows)]);
