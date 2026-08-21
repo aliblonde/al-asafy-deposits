@@ -90,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['role'] = $user['role'];
                 $_SESSION['investor_id'] = $user['investor_id'];
+                $_SESSION['session_version'] = (int)($user['session_version'] ?? 1);
                 $_SESSION['last_activity'] = time();
 
                 // Update last_login_at

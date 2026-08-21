@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'disbursed' => $amountToDisburse,
                 'currency' => $payoutCurrency,
                 'receipt_no' => $receiptNo,
-                'due_date' => $useDueDate,
+                'due_date' => isset($nextDueDate) && $nextDueDate ? $nextDueDate->format('d/m/Y') : formatDate($today),
             ];
 
         } catch (PDOException $e) {

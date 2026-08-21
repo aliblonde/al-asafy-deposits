@@ -6,7 +6,7 @@ require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
 
-requireRole(['admin']);
+requirePermission('users.manage');
 
 $pdo = getPDO();
 $pageTitle = 'إضافة موظف جديد';
@@ -18,11 +18,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role = $_POST['role'] ?? 'staff';
     $password = $_POST['password'] ?? '';
 
+    $passCheck = validatePasswordPolicy($password);
+
     // Validation
     if (strlen($username) < 3)
         $errors[] = 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل.';
-    if (strlen($password) < 10)
-        $errors[] = 'كلمة المرور يجب أن تكون 10 أحرف على الأقل.';
+    if (!$passCheck['valid'])
+        $errors[] = $passCheck['error'];
     if (!in_array($role, ['admin', 'staff']))
         $errors[] = 'صلاحية غير صحيحة.';
 

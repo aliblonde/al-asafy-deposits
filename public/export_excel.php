@@ -138,6 +138,19 @@ logActivity($pdo, 'EXPORT_EXCEL', 'reports', null, null, ['report' => $report, '
 // ── Try PhpSpreadsheet ─────────────────────────────────────
 $spreadsheetPath = __DIR__ . '/../vendor/phpoffice/phpspreadsheet/src/PhpSpreadsheet/Spreadsheet.php';
 
+// CSV / Excel Formula Injection Sanitizer
+function sanitizeExcelCell(mixed $val): mixed {
+    if (is_string($val)) {
+        $trimmed = ltrim($val);
+        if ($trimmed !== '' && in_array($trimmed[0], ['=', '+', '-', '@'], true)) {
+            return "'" . $val;
+        }
+    }
+    return $val;
+}
+
+$safeFilename = preg_replace('/[^\w\s\x{0600}-\x{06FF}-]/u', '_', $filename);
+
 if (file_exists($spreadsheetPath)) {
     require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -150,7 +163,7 @@ if (file_exists($spreadsheetPath)) {
         $headers = array_keys($rows[0]);
         foreach ($headers as $c => $h) {
             $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c + 1);
-            $sheet->setCellValue($col . '1', $h);
+            $sheet->setCellValue($col . '1', sanitizeExcelCell($h));
             $sheet->getStyle($col . '1')->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
                 'fill' => [
@@ -165,7 +178,12 @@ if (file_exists($spreadsheetPath)) {
         foreach ($rows as $ri => $row) {
             foreach (array_values($row) as $c => $val) {
                 $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c + 1);
-                $sheet->setCellValue($col . ($ri + 2), $val);
+                $safeVal = sanitizeExcelCell($val);
+                if (is_numeric($safeVal)) {
+                    $sheet->setCellValue($col . ($ri + 2), $safeVal);
+                } else {
+                    $sheet->setCellValueExplicit($col . ($ri + 2), (string)$safeVal, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                }
             }
         }
         foreach (range(1, count($headers)) as $c) {
@@ -174,7 +192,8 @@ if (file_exists($spreadsheetPath)) {
     }
 
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    header('Content-Disposition: attachment; filename="' . $filename . '.xlsx"');
+    header('Content-Disposition: attachment; filename="' . $safeFilename . '.xlsx"');
+    header('X-Content-Type-Options: nosniff');
     header('Cache-Control: max-age=0');
 
     $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);

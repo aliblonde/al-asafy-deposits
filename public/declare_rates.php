@@ -6,7 +6,10 @@ require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/logger.php';
 
-requireRole(['admin', 'staff']);
+require_once __DIR__ . '/../config/rbac.php';
+require_once __DIR__ . '/../config/approval.php';
+
+requirePermission('rates.request_declaration');
 $pdo = getPDO();
 
 $errs = [];

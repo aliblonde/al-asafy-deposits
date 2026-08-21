@@ -1,1 +1,0 @@
-<?php $page_title='Edit Customer';require_once __DIR__.'/../includes/admin-header.php';$s=db()->prepare('SELECT * FROM customers WHERE id=?');$s->execute([(int)($_GET['id']??0)]);$customer=$s->fetch();if(!$customer){http_response_code(404);exit('Customer not found.');}require __DIR__.'/customer-form.php';require __DIR__.'/../includes/admin-footer.php';
