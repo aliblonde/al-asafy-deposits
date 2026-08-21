@@ -1,69 +1,62 @@
 <?php
-// public/deposits.php — Deposits List with Filters
+// public/deposits.php — Deposits Dashboard & Close Approval Submission
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/rbac.php';
 require_once __DIR__ . '/../config/helpers.php';
+require_once __DIR__ . '/../config/approval.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/logger.php';
 
-requireRole(['admin', 'staff']);
+requirePermission('deposits.view');
 $pdo = getPDO();
 
-// Handle Deposit Completion
+// Handle Deposit Completion Request
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_deposit_id'])) {
     verifyCsrf();
+    requirePermission('deposits.request_close');
+
     $dId = (int) $_POST['complete_deposit_id'];
 
-    $stmt = $pdo->prepare("SELECT d.*, (SELECT COUNT(*) FROM transactions t WHERE t.deposit_id = d.id AND t.type = 'withdraw') as withdraw_count FROM deposits d WHERE d.id = ? AND d.status IN ('active', 'completed')");
+    $stmt = $pdo->prepare("
+        SELECT d.*, 
+               (SELECT COUNT(*) FROM transactions t WHERE t.deposit_id = d.id AND t.type = 'withdraw') as withdraw_count 
+        FROM deposits d 
+        WHERE d.id = ? AND d.status IN ('active', 'completed')
+    ");
     $stmt->execute([$dId]);
     $dep = $stmt->fetch();
 
     if (!$dep) {
         setFlash('danger', 'الوديعة غير موجودة أو ملغاة.');
-    } elseif ($dep['withdraw_count'] > 0) {
-        setFlash('warning', 'عذراً، تم إرجاع رأس المال لهذه الوديعة مسبقاً.');
+    } elseif ((int)$dep['principal_refunded'] === 1) {
+        setFlash('warning', 'عذراً، تم إرجاع رأس المال لهذه الوديعة وتأكيد إنهائها مسبقاً.');
     } elseif ($dep['end_date'] > date('Y-m-d')) {
-        setFlash('warning', 'لا يمكن إنهاء الوديعة قبل تاريخ استحقاقها.');
-    } elseif ((float) $dep['accumulated_profit'] > 0 || isDepositProfitDue($dep) || isDepositMonthlyProfitDue($dep)) {
-        setFlash('warning', 'عفواً، لا يمكن إنهاء الوديعة وإرجاع رأس المال حتى يتم صرف جميع أرباحها التراكمية والشهرية المستحقة أولاً.');
+        setFlash('warning', 'لا يمكن تقديم طلب إنهاء الوديعة قبل حلول تاريخ استحقاقها المستحق (' . formatDate($dep['end_date']) . ').');
+    } elseif ((float)$dep['accumulated_profit'] > 0 || isDepositProfitDue($dep) || isDepositMonthlyProfitDue($dep)) {
+        setFlash('warning', 'عفواً، لا يمكن طلب إنهاء الوديعة وإرجاع رأس المال حتى يتم صرف جميع أرباحها التراكمية والشهرية المستحقة أولاً.');
     } else {
         try {
-            $pdo->beginTransaction();
-            $receiptNo = generateReceiptNo($pdo);
+            // Create Approval Request ONLY (Zero direct execution)
+            $reqId = createApprovalRequest(
+                $pdo,
+                'deposits.close',
+                'deposit',
+                $dId,
+                [
+                    'deposit_id' => $dId
+                ]
+            );
 
-            $pdo->prepare(
-                "INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
-                 VALUES (?, ?, ?, 'withdraw', ?, ?, NOW(), ?)"
-            )->execute([
-                        $receiptNo,
-                        $dep['investor_id'],
-                        $dep['id'],
-                        $dep['amount'],
-                        $dep['currency'] ?? 'IQD',
-                        'إرجاع رأس المال وإنهاء الوديعة'
-                    ]);
+            setFlash('info', 'تم تقديم طلب إنهاء الوديعة وإرجاع رأس المال للوديعة #' . $dId . ' بنجاح (طلب رقم #' . $reqId . '). لن يتغير وضع الوديعة أو يُصرف رأس المال حتى يتم اعتماده.');
 
-            $pdo->prepare("UPDATE deposits SET status = 'completed', last_withdrawal_date = CURDATE() WHERE id = ?")
-                ->execute([$dep['id']]);
-
-            $pdo->commit();
-            logActivity($pdo, 'COMPLETE_DEPOSIT', 'deposits', $dep['id'], null, [
-                'receipt_no' => $receiptNo,
-                'refunded_amount' => $dep['amount'],
-                'currency' => $dep['currency'] ?? 'IQD'
-            ]);
-
-            setFlash('success', 'تم إنهاء الوديعة وإرجاع رأس المال بنجاح. بموجب الإيصال رقم: ' . $receiptNo);
-        } catch (Exception $e) {
-            if ($pdo->inTransaction())
-                $pdo->rollBack();
-            setFlash('danger', 'حدث خطأ أثناء معالجة الطلب: ' . $e->getMessage());
+        } catch (Throwable $e) {
+            setFlash('danger', getSafeErrorMessage($e, 'حدث خطأ أثناء تقديم طلب إنهاء الوديعة.'));
         }
     }
     header('Location: deposits.php');
     exit;
 }
-
 
 // Filters
 $fStatus = $_GET['status'] ?? '';
@@ -115,10 +108,7 @@ $deposits = $pdo->prepare(
 $deposits->execute($params);
 $deposits = $deposits->fetchAll();
 
-// For investor dropdown
 $investors = $pdo->query("SELECT id, full_name FROM investors ORDER BY full_name")->fetchAll();
-
-$today = new DateTimeImmutable(date('Y-m-d'));
 
 $pageTitle = 'الودائع';
 include __DIR__ . '/../includes/header.php';
@@ -133,18 +123,14 @@ include __DIR__ . '/../includes/header.php';
             <div class="page-header">
                 <div>
                     <h1 class="page-title"><i class="bi bi-bank me-2"></i>الودائع</h1>
-                    <p class="page-subtitle">إجمالي النتائج:
-                        <?= count($deposits) ?> وديعة
-                    </p>
+                    <p class="page-subtitle">إجمالي النتائج: <?= count($deposits) ?> وديعة</p>
                 </div>
                 <div class="d-flex gap-2">
-                    <a href="profit_run.php" class="btn btn-outline-gold"
-                        onclick="return confirm('هل أنت متأكد من رغبتك في الانتقال لصفحة صرف أرباح جميع الودائع؟');">
-                        <i class="bi bi-cash-stack me-1"></i> صرف أرباح الكل
-                    </a>
-                    <a href="deposit_add.php" class="btn btn-gold">
-                        <i class="bi bi-plus-lg me-1"></i> إضافة وديعة
-                    </a>
+                    <?php if (userCan('deposits.create')): ?>
+                        <a href="deposit_add.php" class="btn btn-gold">
+                            <i class="bi bi-plus-lg me-1"></i> إضافة وديعة
+                        </a>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -156,9 +142,7 @@ include __DIR__ . '/../includes/header.php';
                         <select name="status" class="form-select form-select-sm">
                             <option value="">— الكل —</option>
                             <?php foreach (['active' => 'نشطة', 'completed' => 'منتهية', 'cancelled' => 'ملغاة', 'defaulted' => 'متعثرة'] as $v => $l): ?>
-                                <option value="<?= $v ?>" <?= $fStatus === $v ? 'selected' : '' ?>>
-                                    <?= $l ?>
-                                </option>
+                                <option value="<?= $v ?>" <?= $fStatus === $v ? 'selected' : '' ?>><?= $l ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -175,9 +159,7 @@ include __DIR__ . '/../includes/header.php';
                         <select name="type" class="form-select form-select-sm">
                             <option value="">— الكل —</option>
                             <?php foreach (['6_months' => '6 أشهر', '1_year' => 'سنة', '2_years' => 'سنتين', '3_years' => '3 سنوات'] as $v => $l): ?>
-                                <option value="<?= $v ?>" <?= $fType === $v ? 'selected' : '' ?>>
-                                    <?= $l ?>
-                                </option>
+                                <option value="<?= $v ?>" <?= $fType === $v ? 'selected' : '' ?>><?= $l ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
@@ -186,28 +168,22 @@ include __DIR__ . '/../includes/header.php';
                         <select name="investor_id" class="form-select form-select-sm">
                             <option value="">— الكل —</option>
                             <?php foreach ($investors as $inv): ?>
-                                <option value="<?= $inv['id'] ?>" <?= $fInvestor === (int) $inv['id'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($inv['full_name']) ?>
-                                </option>
+                                <option value="<?= $inv['id'] ?>" <?= $fInvestor === (int) $inv['id'] ? 'selected' : '' ?>><?= htmlspecialchars($inv['full_name']) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="col-sm-6 col-md-2">
                         <label class="form-label">من تاريخ</label>
-                        <input type="date" name="date_from" class="form-control form-control-sm"
-                            value="<?= htmlspecialchars($fDateFrom) ?>">
+                        <input type="date" name="date_from" class="form-control form-control-sm" value="<?= htmlspecialchars($fDateFrom) ?>">
                     </div>
                     <div class="col-sm-6 col-md-2">
                         <label class="form-label">إلى تاريخ</label>
-                        <input type="date" name="date_to" class="form-control form-control-sm"
-                            value="<?= htmlspecialchars($fDateTo) ?>">
+                        <input type="date" name="date_to" class="form-control form-control-sm" value="<?= htmlspecialchars($fDateTo) ?>">
                     </div>
 
                     <div class="col-12 mt-3 text-start">
-                        <button type="submit" class="btn btn-gold btn-sm px-4"><i class="bi bi-search me-1"></i>
-                            تصفية</button>
-                        <a href="deposits.php" class="btn btn-outline-gold btn-sm px-4"><i class="bi bi-x me-1"></i>
-                            إعادة ضبط</a>
+                        <button type="submit" class="btn btn-gold btn-sm px-4"><i class="bi bi-search me-1"></i> تصفية</button>
+                        <a href="deposits.php" class="btn btn-outline-gold btn-sm px-4"><i class="bi bi-x me-1"></i> إعادة ضبط</a>
                     </div>
                 </div>
             </form>
@@ -223,7 +199,7 @@ include __DIR__ . '/../includes/header.php';
                                 <th>المبلغ والعملة</th>
                                 <th>مدة الوديعة</th>
                                 <th>دورية السحب</th>
-                                <th>الأرباح التراكمية</th>
+                                <th>الأرباح المتراكمة</th>
                                 <th>تاريخ آخر سحب</th>
                                 <th>الاستحقاق للصرف</th>
                                 <th>الحالة</th>
@@ -239,151 +215,76 @@ include __DIR__ . '/../includes/header.php';
                                 $isMonthlyProfitDue = isDepositMonthlyProfitDue($d);
                                 $hasUndisbursedProfit = $hasProfit || $isDue || $isMonthlyProfitDue;
 
-                                $isReadyToClose = ($d['end_date'] <= date('Y-m-d') && !$hasUndisbursedProfit && $d['withdraw_count'] == 0) || ($d['status'] === 'completed' && !$hasUndisbursedProfit && $d['withdraw_count'] == 0);
-                                $isPendingClosure = ($d['end_date'] <= date('Y-m-d') || $d['status'] === 'completed') && $hasUndisbursedProfit && $d['withdraw_count'] == 0;
-
-                                $diffExpiry = null;
-                                if ($d['status'] === 'active' && $d['end_date']) {
-                                    $endDateObj = new DateTimeImmutable($d['end_date']);
-                                    $todayObj = new DateTimeImmutable(date('Y-m-d'));
-                                    $diffExpiry = (int) $todayObj->diff($endDateObj)->format('%r%a'); // negative if passed
-                                }
+                                $isReadyToClose = ($d['end_date'] <= date('Y-m-d') && !$hasUndisbursedProfit && (int)$d['principal_refunded'] === 0);
+                                $isPendingClosure = ($d['end_date'] <= date('Y-m-d')) && $hasUndisbursedProfit && (int)$d['principal_refunded'] === 0;
                                 ?>
                                 <tr>
                                     <td class="text-muted"><?= $d['id'] ?></td>
                                     <td class="fw-bold"><?= htmlspecialchars($d['full_name']) ?></td>
-                                    <td><span
-                                            class="badge <?= typeBadge($d['code']) ?>"><?= htmlspecialchars($d['name_ar']) ?></span>
-                                    </td>
+                                    <td><span class="badge <?= typeBadge($d['code']) ?>"><?= htmlspecialchars($d['name_ar']) ?></span></td>
                                     <td>
-                                        <div class="fw-bold text-gold">
-                                            <?= formatMoney($d['amount'], $d['currency'] ?? 'IQD') ?>
-                                        </div>
+                                        <div class="fw-bold text-gold"><?= formatMoney($d['amount'], $d['currency'] ?? 'IQD') ?></div>
                                         <div><?= currencyBadge($d['currency'] ?? 'IQD') ?></div>
                                     </td>
                                     <td>
-                                        <div style="font-size:0.85rem"><i
-                                                class="bi bi-play-circle text-success me-1"></i><?= formatDate($d['start_date']) ?>
-                                        </div>
-                                        <div style="font-size:0.85rem"><i
-                                                class="bi bi-stop-circle text-danger me-1"></i><?= formatDate($d['end_date']) ?>
-                                            <?php if ($diffExpiry !== null): ?>
-                                                <?php if ($diffExpiry < 0): ?>
-                                                    <span class="badge bg-danger mt-1 d-block" style="font-size:0.7rem">منتهية
-                                                        الصلاحية</span>
-                                                <?php elseif ($diffExpiry === 0): ?>
-                                                    <span class="badge bg-danger mt-1 d-block" style="font-size:0.7rem">تنتهي
-                                                        اليوم</span>
-                                                <?php elseif ($diffExpiry <= 3): ?>
-                                                    <span class="badge bg-warning mt-1 d-block" style="font-size:0.7rem">تنتهي خلال
-                                                        <?= $diffExpiry ?> أيام</span>
-                                                <?php elseif ($diffExpiry <= 7): ?>
-                                                    <span class="badge bg-info mt-1 d-block" style="font-size:0.7rem">تنتهي خلال
-                                                        <?= $diffExpiry ?> أيام</span>
-                                                <?php endif; ?>
-                                            <?php endif; ?>
-                                        </div>
+                                        <div style="font-size:0.85rem"><i class="bi bi-play-circle text-success me-1"></i><?= formatDate($d['start_date']) ?></div>
+                                        <div style="font-size:0.85rem"><i class="bi bi-stop-circle text-danger me-1"></i><?= formatDate($d['end_date']) ?></div>
                                     </td>
+                                    <td>كل <?= $d['profit_payout_frequency'] ?> شهر</td>
                                     <td>
-                                        كل <?= $d['profit_payout_frequency'] ?> شهر
-                                    </td>
-                                    <td>
-                                        <div
-                                            class="fw-bold <?= $d['accumulated_profit'] > 0 ? 'text-success' : 'text-muted' ?>">
+                                        <div class="fw-bold <?= $d['accumulated_profit'] > 0 ? 'text-success' : 'text-muted' ?>">
                                             <?= formatMoney($d['accumulated_profit'], $d['currency'] ?? 'IQD') ?>
                                         </div>
                                     </td>
-                                    <td>
-                                        <?= formatDate($d['last_withdrawal_date']) ?>
-                                    </td>
+                                    <td><?= formatDate($d['last_withdrawal_date']) ?></td>
                                     <td>
                                         <?php if ($d['status'] === 'active'): ?>
                                             <?php if ($nextStr): ?>
-                                                <div style="font-size:0.9rem">
-                                                    <?= formatDate($nextStr) ?>
-                                                </div>
-                                                <?php if ($isDue): ?>
-                                                    <div style="font-size:0.75rem"
-                                                        class="<?= $hasProfit ? 'text-success fw-bold' : 'text-warning' ?>">
-                                                        <?= $hasProfit ? '<i class="bi bi-check-circle me-1"></i>مستحق الآن' : '<i class="bi bi-hourglass-split me-1"></i>بانتظار إعلان الأرباح' ?>
-                                                    </div>
-                                                <?php else: ?>
-                                                    <div style="font-size:0.75rem" class="text-muted">
-                                                        <i class="bi bi-calendar me-1"></i>جاري الانتظار
-                                                    </div>
-                                                <?php endif; ?>
+                                                <div style="font-size:0.9rem"><?= formatDate($nextStr) ?></div>
                                             <?php else: ?>
                                                 —
                                             <?php endif; ?>
-                                        <?php else:
-                                            echo '—';
-                                        endif; ?>
+                                        <?php else: echo '—'; endif; ?>
                                     </td>
-                                    <td><span class="badge <?= statusBadge($d['status']) ?>">
-                                            <?= arabicStatus($d['status']) ?>
-                                        </span></td>
+                                    <td><span class="badge <?= statusBadge($d['status']) ?>"><?= arabicStatus($d['status']) ?></span></td>
                                     <td>
-                                         <div class="d-flex flex-wrap gap-1 align-items-center">
-                                             <?php if ($d['status'] === 'active'): ?>
-                                                 <?php if ($isDue): ?>
-                                                     <a href="profit_run.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-gold fw-bold px-3"
-                                                         title="صرف الأرباح (تراكمية أو مبلغ يدوي مخصص)">
-                                                         <i class="bi bi-wallet2 me-1"></i> صرف الأرباح
-                                                     </a>
-                                                 <?php else: ?>
-                                                     <button class="btn btn-sm btn-outline-secondary" disabled
-                                                         title="غير مستحقة للصرف بعد (تستحق بتاريخ: <?= formatDate($nextStr) ?>)">
-                                                         <i class="bi bi-lock me-1"></i> غير مستحقة
-                                                     </button>
-                                                 <?php endif; ?>
-
-                                                  <?php if ((int) $d['profit_payout_frequency'] > 1): ?>
-                                                      <?php if ($isMonthlyProfitDue): ?>
-                                                          <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success"
-                                                              title="إضافة ربح شهري يتراكم في حافظة الوديعة">
-                                                              <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
-                                                          </a>
-                                                      <?php else: ?>
-                                                          <?php
-                                                          $nextP = calcNextProfitDate($d);
-                                                          $nextPStr = $nextP ? $nextP->format('Y-m-d') : null;
-                                                          ?>
-                                                          <button class="btn btn-sm btn-outline-secondary" disabled
-                                                              title="لا يمكن إضافة ربح شهري قبل حلول الذكرى الشهرية (تستحق بتاريخ: <?= formatDate($nextPStr) ?>)">
-                                                              <i class="bi bi-lock me-1"></i> ربح تراكمي
-                                                          </button>
-                                                      <?php endif; ?>
+                                          <div class="d-flex flex-wrap gap-1 align-items-center">
+                                              <?php if ($d['status'] === 'active'): ?>
+                                                  <?php if ($isDue && userCan('profits.request_payout')): ?>
+                                                      <a href="profit_run.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-gold fw-bold px-3" title="طلب صرف الأرباح">
+                                                          <i class="bi bi-wallet2 me-1"></i> طلب صرف
+                                                      </a>
                                                   <?php endif; ?>
 
-                                                  <?php if ($isReadyToClose): ?>
-                                                      <form method="post" class="d-inline m-0"
-                                                          onsubmit="return confirm('هل أنت متأكد من إنهاء هذه الوديعة وإرجاع مبلغ رأس المال للمستثمر بصفة نهائية؟');">
+                                                  <?php if ((int)$d['profit_payout_frequency'] > 1 && $isMonthlyProfitDue && userCan('profits.request_manual')): ?>
+                                                      <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success" title="طلب إضافة ربح شهري تراكمي">
+                                                          <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
+                                                      </a>
+                                                  <?php endif; ?>
+
+                                                  <?php if ($isReadyToClose && userCan('deposits.request_close')): ?>
+                                                      <form method="post" class="d-inline m-0" onsubmit="return confirm('هل أنت متأكد من تقديم طلب إنهاء هذه الوديعة وإرجاع مبلغ رأس المال للمستثمر؟');">
                                                           <?= csrfField() ?>
                                                           <input type="hidden" name="complete_deposit_id" value="<?= $d['id'] ?>">
-                                                          <button type="submit" class="btn btn-sm btn-danger"
-                                                              title="إنهاء الوديعة وإرجاع رأس المال">
-                                                              <i class="bi bi-x-octagon"></i> إنهاء الوديعة
+                                                          <button type="submit" class="btn btn-sm btn-danger" title="تقديم طلب إنهاء الوديعة وإرجاع رأس المال">
+                                                              <i class="bi bi-x-octagon"></i> طلب إنهاء
                                                           </button>
                                                       </form>
-                                                  <?php elseif ($isPendingClosure): ?>
-                                                      <button class="btn btn-sm btn-outline-danger" disabled
-                                                          title="انتهت مدة الوديعة. يجب صرف جميع أرباحها المستحقة التراكمية أو الشهرية أولاً ليمكن إغلاقها.">
-                                                          <i class="bi bi-x-octagon"></i> إنهاء الوديعة
-                                                      </button>
                                                   <?php endif; ?>
 
-                                                  <a href="deposit_add.php?edit=<?= $d['id'] ?>"
-                                                      class="btn btn-sm btn-outline-gold" title="تعديل الوديعة">
-                                                      <i class="bi bi-pencil"></i>
-                                                  </a>
-                                              </div>
-                                          <?php endif; ?>
+                                                  <?php if (userCan('deposits.update')): ?>
+                                                      <a href="deposit_add.php?edit=<?= $d['id'] ?>" class="btn btn-sm btn-outline-gold" title="تعديل الوديعة">
+                                                          <i class="bi bi-pencil"></i>
+                                                      </a>
+                                                  <?php endif; ?>
+                                              <?php endif; ?>
+                                          </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
                             <?php if (empty($deposits)): ?>
                                 <tr>
-                                    <td colspan="12" class="text-center text-muted py-4">لا توجد ودائع تطابق الفلاتر</td>
+                                    <td colspan="11" class="text-center text-muted py-4">لا توجد ودائع تطابق الفلاتر</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>

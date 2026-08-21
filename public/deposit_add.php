@@ -1,19 +1,28 @@
 <?php
-// public/deposit_add.php — Add New Deposit
+// public/deposit_add.php — Add New Deposit / Edit Existing Deposit
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/rbac.php';
 require_once __DIR__ . '/../config/helpers.php';
+require_once __DIR__ . '/../config/approval.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/logger.php';
 
-requireRole(['admin', 'staff']);
+requireLogin();
 $pdo = getPDO();
+
+$editId = (int)($_GET['edit'] ?? 0);
+$getInvestorId = (int)($_GET['investor_id'] ?? 0);
+
+if ($editId) {
+    requirePermission('deposits.update');
+} else {
+    requirePermission('deposits.create');
+}
 
 $investors = $pdo->query("SELECT id, full_name FROM investors ORDER BY full_name")->fetchAll();
 $depositTypes = $pdo->query("SELECT * FROM deposit_types ORDER BY min_days")->fetchAll();
 
-$editId = (int)($_GET['edit'] ?? 0);
-$getInvestorId = (int)($_GET['investor_id'] ?? 0);
 $deposit = null;
 $form = [];
 
@@ -21,11 +30,23 @@ if ($editId) {
     $stmt = $pdo->prepare("SELECT * FROM deposits WHERE id = ?");
     $stmt->execute([$editId]);
     $deposit = $stmt->fetch(PDO::FETCH_ASSOC);
+
     if (!$deposit) {
         setFlash('danger', 'الوديعة غير موجودة.');
         header('Location: deposits.php');
         exit;
     }
+
+    // Ownership & Supervisor Check
+    $isOwner = ((int)($deposit['created_by'] ?? 0) === currentUserId());
+    $isSupervisor = userCan('deposits.supervise_update') || currentRole() === 'admin';
+
+    if (!$isOwner && !$isSupervisor) {
+        setFlash('danger', 'عفواً، لا يملك الإذن بتعديل هذه الوديعة سوى منشئها الأول أو مسؤول النظام المشرف.');
+        header('Location: deposits.php');
+        exit;
+    }
+
     $form = $deposit;
 } elseif ($getInvestorId) {
     $form['investor_id'] = $getInvestorId;
@@ -39,25 +60,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $form['investor_id']             = (int)($_POST['investor_id']             ?? 0);
     $form['deposit_type_id']         = (int)($_POST['deposit_type_id']         ?? 0);
     $form['amount']                  = trim($_POST['amount']                   ?? '');
-    $form['currency']                = in_array($_POST['currency'] ?? '', ['IQD','USD']) ? $_POST['currency'] : 'IQD';
+    $form['currency']                = in_array($_POST['currency'] ?? '', ['IQD','USD'], true) ? $_POST['currency'] : 'IQD';
     $form['start_date']              = trim($_POST['start_date']               ?? '');
-    $payoutFrequency = (int) ($_POST['profit_payout_frequency'] ?? 1);
+    $payoutFrequency                 = (int)($_POST['profit_payout_frequency'] ?? 1);
 
-    // Validate
-    if (!$form['investor_id'])
+    if (!$form['investor_id']) {
         $errors[] = 'يجب اختيار المستثمر.';
-    if (!$form['deposit_type_id'])
+    }
+    if (!$form['deposit_type_id']) {
         $errors[] = 'يجب اختيار نوع الوديعة.';
+    }
 
     $amount = (float) $form['amount'];
-    if ($amount <= 0 || $amount < 100)
+    if ($amount <= 0 || $amount < 100) {
         $errors[] = 'المبلغ يجب أن يكون 100 أو أكثر.';
+    }
 
     if (!$form['start_date']) {
         $errors[] = 'يجب تحديد تاريخ البداية.';
     }
 
-    // Fetch the selected deposit type
     $selType = null;
     foreach ($depositTypes as $dt) {
         if ((int) $dt['id'] === $form['deposit_type_id']) {
@@ -65,15 +87,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
         }
     }
-    if (!$selType)
+    if (!$selType) {
         $errors[] = 'نوع الوديعة غير صالح.';
-    
-    // Validate payout frequency
+    }
+
     if ($payoutFrequency < 1 || $payoutFrequency > 12) {
         $errors[] = 'دورية صرف الأرباح يجب أن تكون بين شهر و 12 شهراً.';
     }
 
-    // Calculate end_date based on max_days
     $endDate = null;
     if ($selType && $form['start_date']) {
         $startDt = DateTimeImmutable::createFromFormat('Y-m-d', $form['start_date']);
@@ -89,12 +110,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $startDateStr = $form['start_date'];
 
         try {
-            $pdo->beginTransaction();
-
             if ($editId) {
-                // Update existing deposit
+                // EDIT EXISTING DEPOSIT: Financial changes MUST create an Approval Request
+                $isFinancialChange = (
+                    (float)$deposit['amount'] !== $amount ||
+                    $deposit['currency'] !== $form['currency'] ||
+                    (int)$deposit['investor_id'] !== $form['investor_id'] ||
+                    (int)$deposit['deposit_type_id'] !== $form['deposit_type_id']
+                );
+
+                if ($isFinancialChange) {
+                    $payload = [
+                        'deposit_id' => $editId,
+                        'new_amount' => $amount,
+                        'new_currency' => $form['currency'],
+                        'new_investor_id' => $form['investor_id'],
+                        'new_deposit_type_id' => $form['deposit_type_id'],
+                        'start_date' => $startDateStr,
+                        'end_date' => $endDateStr,
+                        'payout_frequency' => $payoutFrequency
+                    ];
+
+                    $reqId = createApprovalRequest(
+                        $pdo,
+                        'deposits.financial_change',
+                        'deposit',
+                        $editId,
+                        $payload,
+                        $deposit
+                    );
+
+                    setFlash('info', 'تم تقديم طلب تعديل البيانات المالية للوديعة رقم #' . $editId . ' (طلب موافقة رقم #' . $reqId . '). لن تتغير البيانات حتى الاعتماد.');
+                    header('Location: deposits.php');
+                    exit;
+                } else {
+                    // Non-financial edits only (dates / payout frequency)
+                    $stmt = $pdo->prepare(
+                        "UPDATE deposits SET start_date=?, end_date=?, profit_payout_frequency=? WHERE id=?"
+                    );
+                    $stmt->execute([
+                        $startDateStr,
+                        $endDateStr,
+                        $payoutFrequency,
+                        $editId
+                    ]);
+
+                    logActivity($pdo, 'UPDATE_DEPOSIT_NON_FINANCIAL', 'deposits', $editId, $deposit, [
+                        'start_date' => $startDateStr,
+                        'end_date' => $endDateStr,
+                        'payout_frequency' => $payoutFrequency
+                    ]);
+
+                    setFlash('success', 'تم تعديل البيانات غير المالية للوديعة بنجاح.');
+                    header('Location: deposits.php');
+                    exit;
+                }
+
+            } else {
+                // CREATE NEW DEPOSIT (Initial creation transaction)
+                $pdo->beginTransaction();
+
                 $stmt = $pdo->prepare(
-                    "UPDATE deposits SET investor_id=?, deposit_type_id=?, amount=?, currency=?, start_date=?, end_date=?, profit_payout_frequency=? WHERE id=?"
+                    "INSERT INTO deposits (investor_id, deposit_type_id, amount, currency, start_date, end_date, profit_payout_frequency, accumulated_profit, paid_profit, principal_refunded, status, created_by, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 0.00, 0.00, 0, 'active', ?, NOW())"
                 );
                 $stmt->execute([
                     $form['investor_id'],
@@ -104,43 +182,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $startDateStr,
                     $endDateStr,
                     $payoutFrequency,
-                    $editId
-                ]);
-
-                $pdo->commit();
-
-                // Log
-                logActivity($pdo, 'UPDATE_DEPOSIT', 'deposits', $editId, $deposit, [
-                    'investor_id' => $form['investor_id'],
-                    'type_id' => $form['deposit_type_id'],
-                    'amount' => $amount,
-                    'start_date' => $startDateStr,
-                    'end_date' => $endDateStr,
-                    'payout_frequency' => $payoutFrequency
-                ]);
-
-                setFlash('success', "تم تعديل بيانات الوديعة بنجاح!");
-                header('Location: deposits.php');
-                exit;
-
-            } else {
-                // Insert new deposit
-                $stmt = $pdo->prepare(
-                    "INSERT INTO deposits (investor_id, deposit_type_id, amount, currency, start_date, end_date, profit_payout_frequency, accumulated_profit, status)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, 0.00, 'active')"
-                );
-                $stmt->execute([
-                    $form['investor_id'],
-                    $form['deposit_type_id'],
-                    $amount,
-                    $form['currency'],
-                    $startDateStr,
-                    $endDateStr,
-                    $payoutFrequency
+                    currentUserId()
                 ]);
                 $depositId = (int)$pdo->lastInsertId();
 
-                // Generate receipt_no and insert transaction
                 $receiptNo = generateReceiptNo($pdo);
                 $pdo->prepare(
                     "INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
@@ -156,14 +201,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $pdo->commit();
 
-                // Log
                 logActivity($pdo, 'CREATE_DEPOSIT', 'deposits', $depositId, null, [
                     'investor_id' => $form['investor_id'],
                     'type' => $selType['code'],
                     'amount' => $amount,
+                    'currency' => $form['currency'],
                     'start_date' => $startDateStr,
                     'end_date' => $endDateStr,
-                    'payout_frequency' => $payoutFrequency,
                     'receipt_no' => $receiptNo,
                 ]);
 
@@ -172,10 +216,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
 
-        } catch (PDOException $e) {
-            if ($pdo->inTransaction())
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
                 $pdo->rollBack();
-            $errors[] = 'حدث خطأ أثناء الحفظ: ' . $e->getMessage();
+            }
+            $errors[] = getSafeErrorMessage($e, 'حدث خطأ أثناء حفظ الوديعة.');
         }
     }
 }
@@ -193,7 +238,7 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <h1 class="page-title"><i class="bi bi-<?= $editId ? 'pencil-square' : 'plus-circle' ?> me-2"></i><?= $editId ? 'تعديل بيانات وديعة' : 'إضافة وديعة جديدة' ?></h1>
                 </div>
-                <a href="/deposits.php" class="btn btn-outline-gold">
+                <a href="deposits.php" class="btn btn-outline-gold">
                     <i class="bi bi-arrow-right me-1"></i> عودة للودائع
                 </a>
             </div>
@@ -202,9 +247,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="alert flash-danger border mb-3" style="border-radius:8px">
                     <ul class="mb-0 pe-3">
                         <?php foreach ($errors as $e): ?>
-                            <li>
-                                <?= htmlspecialchars($e) ?>
-                            </li>
+                            <li><?= htmlspecialchars($e) ?></li>
                         <?php endforeach; ?>
                     </ul>
                 </div>
@@ -277,21 +320,12 @@ include __DIR__ . '/../includes/header.php';
                                         <option value="12" <?= (int)($form['profit_payout_frequency'] ?? 1) === 12 ? 'selected' : '' ?>>كل سنة</option>
                                     </select>
                                 </div>
-
-                                <!-- Long Days (only for long type) -->
-                                <div class="col-md-6" id="longDaysRow" style="display:none">
-                                    <label class="form-label">عدد الأيام (180–360) <span
-                                            class="text-danger">*</span></label>
-                                    <input type="number" name="long_days" id="longDaysInput" class="form-control"
-                                        min="180" max="360" placeholder="مثال: 270"
-                                        value="<?= htmlspecialchars($form['long_days'] ?? '') ?>">
-                                </div>
                             </div>
 
                             <hr class="divider my-4">
 
                             <div class="d-flex gap-2 justify-content-end">
-                                <a href="/deposits.php" class="btn btn-outline-gold">إلغاء</a>
+                                <a href="deposits.php" class="btn btn-outline-gold">إلغاء</a>
                                 <button type="submit" class="btn btn-gold px-4">
                                     <i class="bi bi-save me-1"></i> <?= $editId ? 'حفظ التعديلات' : 'حفظ الوديعة' ?>
                                 </button>
@@ -302,12 +336,6 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
         </div>
-        <?php
-        $extraScript = <<<JS
-<script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Any specific dynamic ui interactions
-        });
-</script>
-JS;
-        include __DIR__ . '/../includes/footer.php'; ?>
+    </div>
+</div>
+<?php include __DIR__ . '/../includes/footer.php'; ?>
