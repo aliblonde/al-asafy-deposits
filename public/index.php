@@ -9,7 +9,7 @@ require_once __DIR__ . '/../config/logger.php';
 // Redirect if already logged in
 if (isLoggedIn()) {
     $role = currentRole();
-    header('Location: ' . ($role === 'investor' ? '/investor_portal.php' : '/dashboard.php'));
+    header('Location: ' . ($role === 'investor' ? 'investor_portal.php' : 'dashboard.php'));
     exit;
 }
 
@@ -20,36 +20,51 @@ header("Expires: 0");
 
 $error = '';
 
+if (!isset($_SESSION['login_attempts'])) {
+    $_SESSION['login_attempts'] = 0;
+    $_SESSION['last_attempt_time'] = time();
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $role_sel = $_POST['role'] ?? '';
-
-    if ($username && $password) {
-        $pdo = getPDO();
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? AND role = ? LIMIT 1");
-        $stmt->execute([$username, $role_sel]);
-        $user = $stmt->fetch();
-
-        if ($user && password_verify($password, $user['password_hash'])) {
-            session_regenerate_id(true);
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            $_SESSION['investor_id'] = $user['investor_id'];
-
-            // Update last_login_at
-            $pdo->prepare("UPDATE users SET last_login_at=NOW() WHERE id=?")->execute([$user['id']]);
-            logActivity($pdo, 'LOGIN', 'users', $user['id'], null, ['role' => $user['role']]);
-
-            header('Location: ' . ($user['role'] === 'investor' ? '/investor_portal.php' : '/dashboard.php'));
-            exit;
-        } else {
-            $error = 'اسم المستخدم أو كلمة المرور غير صحيحة، أو الدور المحدد لا يطابق حسابك.';
-        }
+    
+    // Check Rate Limiting (Block if > 5 failed attempts in 15 minutes)
+    if ($_SESSION['login_attempts'] >= 5 && (time() - $_SESSION['last_attempt_time']) < 900) {
+        $remaining = ceil((900 - (time() - $_SESSION['last_attempt_time'])) / 60);
+        $error = "عفواً، تم تجاوز عدد محاولات الدخول المسموح بها. يرجى الانتظار لمدة {$remaining} دقيقة قبل المحاولة مجدداً.";
     } else {
-        $error = 'يرجى إدخال اسم المستخدم وكلمة المرور.';
+        $username = trim($_POST['username'] ?? '');
+        $password = $_POST['password'] ?? '';
+        $role_sel = $_POST['role'] ?? '';
+
+        if ($username && $password) {
+            $pdo = getPDO();
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? AND role = ? LIMIT 1");
+            $stmt->execute([$username, $role_sel]);
+            $user = $stmt->fetch();
+
+            if ($user && password_verify($password, $user['password_hash'])) {
+                session_regenerate_id(true);
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = $user['role'];
+                $_SESSION['investor_id'] = $user['investor_id'];
+                $_SESSION['login_attempts'] = 0;
+
+                // Update last_login_at
+                $pdo->prepare("UPDATE users SET last_login_at=NOW() WHERE id=?")->execute([$user['id']]);
+                logActivity($pdo, 'LOGIN', 'users', $user['id'], null, ['role' => $user['role']]);
+
+                header('Location: ' . ($user['role'] === 'investor' ? 'investor_portal.php' : 'dashboard.php'));
+                exit;
+            } else {
+                $_SESSION['login_attempts']++;
+                $_SESSION['last_attempt_time'] = time();
+                $error = 'اسم المستخدم أو كلمة المرور غير صحيحة، أو الدور المحدد لا يطابق حسابك.';
+            }
+        } else {
+            $error = 'يرجى إدخال اسم المستخدم وكلمة المرور.';
+        }
     }
 }
 

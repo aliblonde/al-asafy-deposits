@@ -2,6 +2,9 @@
 // config/auth.php — Session management + RBAC
 
 if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_httponly', '1');
+    ini_set('session.use_only_cookies', '1');
+    ini_set('session.cookie_samesite', 'Strict');
     session_start();
 }
 
@@ -11,7 +14,7 @@ function isLoggedIn(): bool {
 
 function requireLogin(): void {
     if (!isLoggedIn()) {
-        header('Location: /index.php');
+        header('Location: index.php');
         exit;
     }
 }
@@ -22,7 +25,7 @@ function requireRole(array $roles): void {
         http_response_code(403);
         die('<div style="font-family:sans-serif;color:#c00;padding:30px;text-align:center;direction:rtl">
             <h2>403 — غير مصرح</h2><p>ليس لديك صلاحية للوصول إلى هذه الصفحة.</p>
-            <a href="/index.php">العودة لتسجيل الدخول</a>
+            <a href="index.php">العودة لتسجيل الدخول</a>
             </div>');
     }
 }

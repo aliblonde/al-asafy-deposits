@@ -1,0 +1,6 @@
+# Upload Security: Disable execution of any executable script files
+<FilesMatch "\.(php|php3|php4|php5|phtml|phps|pl|py|cgi|sh|asp|aspx|exe|bat|cmd)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+Options -Indexes

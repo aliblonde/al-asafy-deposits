@@ -1,3 +1,28 @@
-RewriteEngine On
-RewriteCond %{REQUEST_URI} !^/public/
-RewriteRule ^(.*)$ /public/$1 [L]
+# Hardened Security Configuration for Al-Asafy Deposits System
+
+# Disable Directory Browsing
+Options -Indexes
+
+# Prevent access to sensitive files
+<FilesMatch "\.(log|sql|md|jsonl|env|git|sh|htaccess|htpasswd)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block web access to internal application directories
+RedirectMatch 403 ^/(config|includes|brain|logs|sql)/
+
+# Security HTTP Headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# URL Rewriting for public folder fallback if accessed without public/
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ /public/$1 [L]
+</IfModule>

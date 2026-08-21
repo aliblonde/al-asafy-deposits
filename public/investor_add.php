@@ -45,8 +45,20 @@ function handleUpload($fileKey, $targetDir, $currentPath = '')
   if (!in_array($ext, $allowed)) {
     throw new Exception("نوع ملف غير مسموح به لـ $fileKey. المسموح: PDF, JPG, PNG");
   }
+
+  // MIME Type Validation Guard
+  if (function_exists('finfo_open')) {
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mimeType = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+    $allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/pjpeg'];
+    if (!in_array($mimeType, $allowedMimes)) {
+      throw new Exception("محتوى الملف غير صالح لـ $fileKey.");
+    }
+  }
+
   if ($file['size'] > 5 * 1024 * 1024) { // 5MB
-    throw new Exception("حجم الملف للمخطط $fileKey كبير جداً. الحد الأقصى 5MB.");
+    throw new Exception("حجم الملف كبير جداً. الحد الأقصى 5MB.");
   }
 
   $newName = uniqid('inv_', true) . '.' . $ext;
