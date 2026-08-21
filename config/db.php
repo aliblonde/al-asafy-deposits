@@ -83,6 +83,9 @@ function getPDO(): PDO {
             $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
         } catch (PDOException $e) {
             error_log('Database Connection Failure: ' . $e->getMessage());
+            if (php_sapi_name() === 'cli') {
+                throw $e;
+            }
             http_response_code(500);
             die('<div style="font-family:sans-serif;color:#721c24;background-color:#f8d7da;border:1px solid #f5c6cb;padding:25px;margin:50px auto;max-width:600px;border-radius:8px;text-align:center;direction:rtl">
                 <h3 style="margin-top:0">عذراً، حدث خطأ في الاتصال بالحاسوب المركزية</h3>

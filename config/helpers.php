@@ -275,3 +275,12 @@ function autoCloseExpiredDeposits(PDO $pdo): int
     // Replaced by manual close action in deposits.php
     return 0;
 }
+
+/**
+ * Log technical error and return user-friendly message with error reference ID.
+ */
+function getSafeErrorMessage(Throwable $e, string $userMessage = 'تعذر تنفيذ العملية. يرجى مراجعة مسؤول النظام.'): string {
+    $errorRef = 'ERR-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
+    error_log("[$errorRef] " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+    return $userMessage . " (رمز الخطأ: $errorRef)";
+}
