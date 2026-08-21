@@ -5,6 +5,18 @@
 credentials.md
 *.credentials
 
+# Database Dumps and Backups
+*.sql
+*.dump
+*.sql.gz
+backups/
+database_backups/
+!sql/schema.sql
+!sql/migrations/*.sql
+!sql/create_*.sql
+!sql/alter_*.sql
+!sql/seed.sql
+
 # Logs and error logs
 *.log
 error_log
@@ -17,7 +29,6 @@ logs/
 *.zip
 *.tar
 *.gz
-*.sql.gz
 debug_*.json
 debug_*.txt
 schema_dump.txt

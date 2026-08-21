@@ -2,4 +2,11 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/alasisfh/public_html
-    - /bin/cp -R * $DEPLOYPATH
+    - /bin/cp -f .htaccess $DEPLOYPATH/
+    - /bin/cp -Rf config $DEPLOYPATH/
+    - /bin/cp -Rf includes $DEPLOYPATH/
+    - /bin/cp -Rf public/* $DEPLOYPATH/public/
+    - /bin/cp -f public/.htaccess $DEPLOYPATH/public/.htaccess
+    - /bin/rm -f $DEPLOYPATH/public/admin_seed_test_data.php
+    - /bin/rm -f $DEPLOYPATH/admin_seed_test_data.php
+    - /bin/rm -rf $DEPLOYPATH/tracking

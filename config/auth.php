@@ -77,6 +77,29 @@ function requireLogin(): void {
         exit;
     }
 
+    // Check Session Revocation (session_version)
+    if (isset($_SESSION['user_id'], $_SESSION['session_version'])) {
+        try {
+            $pdo = getPDO();
+            $stmt = $pdo->prepare("SELECT session_version, role FROM users WHERE id = ? LIMIT 1");
+            $stmt->execute([(int)$_SESSION['user_id']]);
+            $user = $stmt->fetch();
+
+            if (!$user || (int)$user['session_version'] !== (int)$_SESSION['session_version']) {
+                destroySessionAndCookie();
+                if (session_status() === PHP_SESSION_NONE) {
+                    session_start();
+                }
+                $_SESSION['flash'] = ['type' => 'warning', 'message' => 'تم إلغاء الجلسة بسبب تغيير كلمة المرور أو تحديث الصلاحيات. يرجى تسجيل الدخول مجدداً.'];
+                header('Location: index.php?revoked=1');
+                exit;
+            }
+            $_SESSION['role'] = $user['role'];
+        } catch (Exception $e) {
+            error_log("Session version check notice: " . $e->getMessage());
+        }
+    }
+
     $_SESSION['last_activity'] = time();
 }
 

@@ -4,7 +4,7 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/helpers.php';
 
-requireRole(['admin']); // Restricted to Admin only
+requirePermission('users.manage');
 
 $pdo = getPDO();
 $pageTitle = 'إدارة الموظفين';

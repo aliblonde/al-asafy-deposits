@@ -6,7 +6,7 @@ require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
 
-requireRole(['admin']);
+requirePermission('users.manage');
 
 $pdo = getPDO();
 $userId = (int) ($_GET['id'] ?? 0);
@@ -18,7 +18,7 @@ $stmt->execute([$userId]);
 $user = $stmt->fetch();
 
 if (!$user) {
-    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'الموضف غير موجود أو غير قابل للتعديل.'];
+    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'الموظف غير موجود أو غير قابل للتعديل.'];
     header('Location: users.php');
     exit;
 }
@@ -29,6 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
     $role = $_POST['role'] ?? $user['role'];
     $password = $_POST['password'] ?? '';
+
+    // Prevent demoting the last admin user
+    if ($user['role'] === 'admin' && $role !== 'admin') {
+        $adminCountStmt = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'");
+        if ((int)$adminCountStmt->fetchColumn() <= 1) {
+            $errors[] = 'لا يمكن تغيير صلاحيات المدير الأخير للنظام لتجنب قفل حساب الإدارة.';
+        }
+    }
 
     // Validation
     if (!in_array($role, ['admin', 'staff']))
@@ -44,13 +52,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE users SET role = ? WHERE id = ?");
             $stmt->execute([$role, $userId]);
 
-            // If password provided, update it
+            // If password provided, update it and invalidate sessions
             if (!empty($password)) {
-                if (strlen($password) < 10) {
-                    throw new Exception('كلمة المرور يجب أن تكون 10 أحرف على الأقل.');
+                $passCheck = validatePasswordPolicy($password);
+                if (!$passCheck['valid']) {
+                    throw new Exception($passCheck['error']);
                 }
                 $hash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+                $stmt = $pdo->prepare("UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?");
                 $stmt->execute([$hash, $userId]);
                 $newData['password_changed'] = true;
             }

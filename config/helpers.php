@@ -242,10 +242,10 @@ function getClientIp(): string
  */
 function validatePasswordPolicy(string $password): array
 {
-    if (mb_strlen($password) < 10) {
+    if (mb_strlen($password) < 12) {
         return [
             'valid' => false,
-            'error' => 'كلمة المرور يجب أن لا تقل عن 10 خانات.'
+            'error' => 'كلمة المرور يجب أن لا تقل عن 12 خانة وفقاً لسياسة الأمان.'
         ];
     }
 

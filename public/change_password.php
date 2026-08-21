@@ -24,10 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([currentUserId()]);
     $user = $stmt->fetch();
 
+    $passCheck = validatePasswordPolicy($newPwd);
     if (!$user || !password_verify($currentPwd, $user['password_hash'])) {
         $errors[] = 'كلمة المرور الحالية غير صحيحة.';
-    } elseif (strlen($newPwd) < 10) {
-        $errors[] = 'كلمة المرور الجديدة يجب أن تكون 10 خانات على الأقل.';
+    } elseif (!$passCheck['valid']) {
+        $errors[] = $passCheck['error'];
     } elseif ($newPwd !== $confirmPwd) {
         $errors[] = 'كلمة المرور الجديدة غير متطابقة مع تأكيد كلمة المرور.';
     }
@@ -35,13 +36,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         try {
             $hash = password_hash($newPwd, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+            $stmt = $pdo->prepare("UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?");
             $stmt->execute([$hash, currentUserId()]);
+
+            // Sync current session version
+            $verStmt = $pdo->prepare("SELECT session_version FROM users WHERE id = ?");
+            $verStmt->execute([currentUserId()]);
+            $_SESSION['session_version'] = (int)$verStmt->fetchColumn();
 
             logActivity($pdo, 'CHANGE_OWN_PASSWORD', 'users', currentUserId(), null, ['description' => 'User changed their own password']);
             $success = true;
         } catch (Exception $e) {
-            $errors[] = 'حدث خطأ أثناء التحديث: ' . $e->getMessage();
+            error_log("Change password error: " . $e->getMessage());
+            $errors[] = 'حدث خطأ داخلي أثناء تحديث كلمة المرور.';
         }
     }
 }
@@ -105,17 +112,17 @@ $isInvestor = (currentRole() === 'investor');
                     <?= csrfField() ?>
                     <div class="mb-3">
                         <label class="form-label">كلمة المرور الحالية</label>
-                        <input type="password" name="current_password" class="form-control" required>
+                        <input type="password" name="current_password" class="form-control" autocomplete="current-password" required>
                     </div>
                     <hr class="my-4" style="border-color: var(--border); opacity:0.5">
                     <div class="mb-3">
                         <label class="form-label">كلمة المرور الجديدة</label>
-                        <input type="password" name="new_password" class="form-control" placeholder="10 خانات على الأقل"
-                            required>
+                        <input type="password" name="new_password" class="form-control" autocomplete="new-password" placeholder="12 خانة على الأقل"
+                            required minlength="12">
                     </div>
                     <div class="mb-4">
                         <label class="form-label">تأكيد كلمة المرور الجديدة</label>
-                        <input type="password" name="confirm_password" class="form-control" required>
+                        <input type="password" name="confirm_password" class="form-control" autocomplete="new-password" required minlength="12">
                     </div>
 
                     <button type="submit" class="btn btn-gold w-100 py-2">

@@ -4,8 +4,94 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/helpers.php';
 
-requireRole(['admin']);
+require_once __DIR__ . '/../config/rbac.php';
+require_once __DIR__ . '/../config/csrf.php';
+
+requirePermission('audit.view');
 $pdo = getPDO();
+
+// Handle Export and Delete-Exported actions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrf();
+    $postAction = $_POST['post_action'] ?? '';
+    
+    if ($postAction === 'export_audit') {
+        requirePermission('audit.export');
+        $expFrom = $_POST['exp_from'] ?? '';
+        $expTo = $_POST['exp_to'] ?? '';
+
+        $wExp = ['1=1']; $pExp = [];
+        if ($expFrom) { $wExp[] = 'created_at >= ?'; $pExp[] = $expFrom . ' 00:00:00'; }
+        if ($expTo) { $wExp[] = 'created_at <= ?'; $pExp[] = $expTo . ' 23:59:59'; }
+
+        $expStmt = $pdo->prepare("SELECT * FROM activity_logs WHERE " . implode(' AND ', $wExp) . " ORDER BY created_at ASC");
+        $expStmt->execute($pExp);
+        $expRows = $expStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $jsonContent = json_encode($expRows, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $fileHash = hash('sha256', $jsonContent);
+        $recCount = count($expRows);
+
+        // Record in audit_export_history
+        $histStmt = $pdo->prepare("
+            INSERT INTO audit_export_history (exported_by, export_time, period_start, period_end, record_count, file_hash)
+            VALUES (?, NOW(), ?, ?, ?, ?)
+        ");
+        $histStmt->execute([
+            currentUserId(),
+            $expFrom ? $expFrom . ' 00:00:00' : null,
+            $expTo ? $expTo . ' 23:59:59' : null,
+            $recCount,
+            $fileHash
+        ]);
+
+        logActivity($pdo, 'EXPORT_AUDIT_LOGS', 'activity_logs', null, null, [
+            'count' => $recCount,
+            'hash' => $fileHash
+        ]);
+
+        $fileName = 'audit_export_' . date('Y-m-d_H-i-s') . '.json';
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $fileName . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, no-store');
+        echo $jsonContent;
+        exit;
+    } elseif ($postAction === 'delete_exported_audit') {
+        requirePermission('audit.delete_exported');
+        $delFrom = $_POST['del_from'] ?? '';
+        $delTo = $_POST['del_to'] ?? '';
+
+        if (!$delFrom || !$delTo) {
+            setFlash('danger', 'يرجى تحديد فترة الحذف بدقة.');
+        } else {
+            // Verify an export history record exists covering this period
+            $chkExp = $pdo->prepare("
+                SELECT COUNT(*) FROM audit_export_history 
+                WHERE (period_start IS NULL OR period_start <= ?) 
+                  AND (period_end IS NULL OR period_end >= ?)
+            ");
+            $chkExp->execute([$delFrom . ' 00:00:00', $delTo . ' 23:59:59']);
+            
+            if ((int)$chkExp->fetchColumn() === 0) {
+                setFlash('danger', 'لا يمكن حذف أي سجلات تدقيق قبل تصديرها بنجاح وتسجيل عملية التصدير أولاً.');
+            } else {
+                $delStmt = $pdo->prepare("DELETE FROM activity_logs WHERE created_at >= ? AND created_at <= ?");
+                $delStmt->execute([$delFrom . ' 00:00:00', $delTo . ' 23:59:59']);
+                $deletedCount = $delStmt->rowCount();
+
+                logActivity($pdo, 'DELETE_EXPORTED_AUDIT_LOGS', 'activity_logs', null, null, [
+                    'deleted_count' => $deletedCount,
+                    'period' => "$delFrom to $delTo"
+                ]);
+
+                setFlash('success', "تم حذف $deletedCount سجل تدقيق مصدّر سابقاً بنجاح.");
+            }
+        }
+        header('Location: activity_logs.php');
+        exit;
+    }
+}
 
 $fUser = (int) ($_GET['user_id'] ?? 0);
 $fAction = trim($_GET['action'] ?? '');

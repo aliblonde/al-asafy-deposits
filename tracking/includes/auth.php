@@ -1,6 +1,0 @@
-<?php
-if(session_status()!==PHP_SESSION_ACTIVE){$secure=!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off';session_set_cookie_params(['lifetime'=>0,'path'=>'/','secure'=>$secure,'httponly'=>true,'samesite'=>'Lax']);session_start();}
-require_once __DIR__.'/../config/database.php';require_once __DIR__.'/functions.php';$security=require __DIR__.'/../config/security.php';
-function end_session():void{$_SESSION=[];if(ini_get('session.use_cookies')){$p=session_get_cookie_params();setcookie(session_name(),'',time()-42000,$p['path'],$p['domain'],$p['secure'],$p['httponly']);}session_destroy();}
-function require_login():void{global $security;if(empty($_SESSION['user']))redirect('login.php');$timeout=(int)($security['session_idle_timeout']??1800);if(!empty($_SESSION['last_activity'])&&time()-$_SESSION['last_activity']>$timeout){$actor=$_SESSION['user'];audit_log('session_timeout','user',(int)$actor['id'],['idle_seconds'=>time()-$_SESSION['last_activity']],$actor);end_session();redirect('login.php?expired=1');}$_SESSION['last_activity']=time();}
-function require_admin():void{require_login();if(($_SESSION['user']['role']??'')!=='admin'){audit_log('permission_denied','admin_page',null,['uri'=>$_SERVER['REQUEST_URI']??'']);http_response_code(403);exit('Administrators only.');}}

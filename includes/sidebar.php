@@ -28,11 +28,13 @@ function sidebarLink(string $href, string $icon, string $label, string $current)
 
         <div class="nav-section-label mt-3">الإدارة</div>
         <?= sidebarLink('investors.php', 'people', 'المستثمرون', $currentPage) ?>
+        <?= sidebarLink('approval_requests.php', 'file-earmark-check', 'طلبات الموافقة', $currentPage) ?>
         <?= sidebarLink('withdraw_requests.php', 'arrow-up-circle', 'طلبات سحب الأرباح', $currentPage) ?>
         <?= sidebarLink('reports.php', 'bar-chart-line', 'التقارير', $currentPage) ?>
         <?= sidebarLink('settings_deposit_types.php', 'gear', 'إعداد نسب الأرباح', $currentPage) ?>
 
         <?php if (currentRole() === 'admin'): ?>
+            <?= sidebarLink('archived_records.php', 'archive', 'أرشيف المحذوفات', $currentPage) ?>
             <?= sidebarLink('activity_logs.php', 'clock-history', 'سجل العمليات', $currentPage) ?>
             <?= sidebarLink('users.php', 'person-badge', 'إدارة الموظفين', $currentPage) ?>
             <?php 
