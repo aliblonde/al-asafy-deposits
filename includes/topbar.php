@@ -1,4 +1,6 @@
-<?php // includes/topbar.php ?>
+<?php // includes/topbar.php
+require_once __DIR__ . '/../config/csrf.php';
+?>
 <div class="topbar">
     <div class="d-flex align-items-center gap-3">
         <button id="sidebarToggle" class="btn btn-outline-gold border-0 p-1" title="تصغير/توسيع القائمة">

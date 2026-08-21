@@ -229,16 +229,41 @@ function setFlash(string $type, string $message): void
     $_SESSION['flash'][] = ['type' => $type, 'msg' => $message];
 }
 
-/** Get client IP address */
+/** Get client IP address safely */
 function getClientIp(): string
 {
-    $keys = ['HTTP_CLIENT_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'];
-    foreach ($keys as $key) {
-        if (!empty($_SERVER[$key])) {
-            return trim(explode(',', $_SERVER[$key])[0]);
-        }
+    return $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+}
+
+/**
+ * Validate password strength against security policy:
+ * - Minimum 10 characters
+ * - Reject trivial and known weak default passwords
+ */
+function validatePasswordPolicy(string $password): array
+{
+    if (mb_strlen($password) < 10) {
+        return [
+            'valid' => false,
+            'error' => 'كلمة المرور يجب أن لا تقل عن 10 خانات.'
+        ];
     }
-    return '0.0.0.0';
+
+    $weakPasswords = [
+        '123456', '12345678', '123456789', '1234567890',
+        'password', 'pass1234', 'admin123', 'admin@123',
+        'staff123', 'staff@123', 'investor123', 'investor@123',
+        'qwerty', '00000000', '11111111'
+    ];
+
+    if (in_array(strtolower(trim($password)), $weakPasswords, true)) {
+        return [
+            'valid' => false,
+            'error' => 'كلمة المرور غير آمنة وشائعة جداً. يرجى اختيار كلمة مرور أكثر تعقيداً.'
+        ];
+    }
+
+    return ['valid' => true, 'error' => ''];
 }
 
 /**

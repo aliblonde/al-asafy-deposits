@@ -8,11 +8,22 @@ require_once __DIR__ . '/../config/logger.php';
 requireLogin();
 $pdo = getPDO();
 
+$userRole = currentRole();
+if (!in_array($userRole, ['admin', 'staff', 'investor'], true)) {
+    http_response_code(403);
+    die('<div style="font-family:sans-serif;color:#c00;padding:30px;text-align:center;direction:rtl"><h2>403 — غير مصرح</h2><p>ليس لديك صلاحية للوصول إلى هذا التقرير.</p></div>');
+}
+
 $report = $_GET['report'] ?? 'transactions';
 $investorId = (int) ($_GET['investor_id'] ?? 0);
-if (currentRole() === 'investor') {
+if ($userRole === 'investor') {
     $investorId = (int) currentInvestorId();
+    if ($investorId <= 0) {
+        http_response_code(403);
+        die('<div style="font-family:sans-serif;color:#c00;padding:30px;text-align:center;direction:rtl"><h2>403 — غير مصرح</h2><p>حساب المستثمر غير معروف.</p></div>');
+    }
 }
+
 $dateFrom = $_GET['date_from'] ?? '';
 $dateTo = $_GET['date_to'] ?? '';
 $receiptNo = trim($_GET['receipt_no'] ?? '');
@@ -25,11 +36,21 @@ $fTxType = $_GET['tx_type'] ?? '';
 $fStatus = $_GET['status'] ?? '';
 $fType = $_GET['type'] ?? '';
 
-if ($receiptNo) {
-    $stmt = $pdo->prepare("SELECT t.receipt_no AS 'رقم الإيصال', i.full_name AS المستثمر, t.type AS النوع, t.amount AS المبلغ, t.date AS التاريخ, t.note AS ملاحظة FROM transactions t JOIN investors i ON i.id=t.investor_id WHERE t.receipt_no LIKE ?");
-    $stmt->execute(['%' . $receiptNo . '%']);
+if ($receiptNo !== '') {
+    if ($userRole === 'investor') {
+        $stmt = $pdo->prepare("SELECT t.receipt_no AS 'رقم الإيصال', i.full_name AS المستثمر, t.type AS النوع, t.amount AS المبلغ, t.date AS التاريخ, t.note AS ملاحظة FROM transactions t JOIN investors i ON i.id=t.investor_id WHERE t.receipt_no = ? AND t.investor_id = ? LIMIT 1");
+        $stmt->execute([$receiptNo, $investorId]);
+    } else {
+        $stmt = $pdo->prepare("SELECT t.receipt_no AS 'رقم الإيصال', i.full_name AS المستثمر, t.type AS النوع, t.amount AS المبلغ, t.date AS التاريخ, t.note AS ملاحظة FROM transactions t JOIN investors i ON i.id=t.investor_id WHERE t.receipt_no LIKE ?");
+        $stmt->execute(['%' . $receiptNo . '%']);
+    }
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    if (empty($rows) && $userRole === 'investor') {
+        http_response_code(404);
+        die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>404 — الإيصال غير موجود</h2><p>لم يتم العثور على الإيصال المطلوب.</p></div>');
+    }
+
     $filename = 'إيصال-' . $receiptNo;
     if (!empty($rows)) {
         $filename = 'إيصال-' . $rows[0]['رقم الإيصال'] . '-' . str_replace(' ', '_', $rows[0]['المستثمر']);
@@ -37,7 +58,7 @@ if ($receiptNo) {
 
 } elseif ($report === 'investor_statement') {
     $where = ['1=1']; $params = [];
-    if ($investorId) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
+    if ($userRole === 'investor' || $investorId > 0) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
     if ($dateFrom) { $where[] = 't.date>=?'; $params[] = $dateFrom . ' 00:00:00'; }
     if ($dateTo) { $where[] = 't.date<=?'; $params[] = $dateTo . ' 23:59:59'; }
     
@@ -46,13 +67,13 @@ if ($receiptNo) {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $filename = 'كشف-حساب-عام';
-    if (!empty($rows) && $investorId) {
+    if (!empty($rows) && $investorId > 0) {
         $filename = 'كشف-حساب-' . str_replace(' ', '_', $rows[0]['المستثمر']);
     }
 
 } elseif ($report === 'profits') {
     $where = ["t.type='profit'"]; $params = [];
-    if ($investorId) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
+    if ($userRole === 'investor' || $investorId > 0) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
     if ($dateFrom) { $where[] = 't.date>=?'; $params[] = $dateFrom . ' 00:00:00'; }
     if ($dateTo) { $where[] = 't.date<=?'; $params[] = $dateTo . ' 23:59:59'; }
     
@@ -61,14 +82,14 @@ if ($receiptNo) {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $filename = 'تقرير-الأرباح-عام';
-    if (!empty($rows) && $investorId) {
+    if (!empty($rows) && $investorId > 0) {
         $filename = 'تقرير-الأرباح-' . str_replace(' ', '_', $rows[0]['المستثمر']);
     }
 
 } elseif ($report === 'transactions') {
     $where = ['1=1']; $params = [];
     if ($fTxType) { $where[] = 't.type=?'; $params[] = $fTxType; }
-    if ($investorId) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
+    if ($userRole === 'investor' || $investorId > 0) { $where[] = 't.investor_id=?'; $params[] = $investorId; }
     if ($dateFrom) { $where[] = 't.date>=?'; $params[] = $dateFrom . ' 00:00:00'; }
     if ($dateTo) { $where[] = 't.date<=?'; $params[] = $dateTo . ' 23:59:59'; }
     
@@ -77,7 +98,7 @@ if ($receiptNo) {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $filename = 'تقرير-المعاملات-عام';
-    if (!empty($rows) && $investorId) {
+    if (!empty($rows) && $investorId > 0) {
         $filename = 'تقرير-المعاملات-' . str_replace(' ', '_', $rows[0]['المستثمر']);
     }
 
@@ -85,7 +106,7 @@ if ($receiptNo) {
     $where = ['1=1']; $params = [];
     if ($fStatus) { $where[] = 'd.status=?'; $params[] = $fStatus; }
     if ($fType) { $where[] = 'dt.code=?'; $params[] = $fType; }
-    if ($investorId) { $where[] = 'd.investor_id=?'; $params[] = $investorId; }
+    if ($userRole === 'investor' || $investorId > 0) { $where[] = 'd.investor_id=?'; $params[] = $investorId; }
     if ($dateFrom) { $where[] = 'd.start_date>=?'; $params[] = $dateFrom; }
     if ($dateTo) { $where[] = 'd.start_date<=?'; $params[] = $dateTo; }
 
@@ -94,7 +115,7 @@ if ($receiptNo) {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     $filename = 'تقرير-الودائع-عام';
-    if (!empty($rows) && $investorId) {
+    if (!empty($rows) && $investorId > 0) {
         $filename = 'تقرير-ودائع-' . str_replace(' ', '_', $rows[0]['المستثمر']);
     }
 }

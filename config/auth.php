@@ -1,11 +1,38 @@
 <?php
 // config/auth.php — Session management + RBAC
 
+require_once __DIR__ . '/csrf.php';
+
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_httponly', '1');
     ini_set('session.use_only_cookies', '1');
     ini_set('session.cookie_samesite', 'Strict');
+    ini_set('session.use_strict_mode', '1');
+
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] ?? '') == 443;
+    if ($isSecure) {
+        ini_set('session.cookie_secure', '1');
+    }
     session_start();
+}
+
+function destroySessionAndCookie(): void {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(
+            session_name(),
+            '',
+            time() - 42000,
+            $params['path'],
+            $params['domain'],
+            $params['secure'],
+            $params['httponly']
+        );
+    }
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
 }
 
 function isLoggedIn(): bool {
@@ -14,9 +41,43 @@ function isLoggedIn(): bool {
 
 function requireLogin(): void {
     if (!isLoggedIn()) {
+        $isDownloadOrExport = str_contains($_SERVER['PHP_SELF'] ?? '', 'download_file.php') 
+                           || str_contains($_SERVER['PHP_SELF'] ?? '', 'export_pdf.php') 
+                           || str_contains($_SERVER['PHP_SELF'] ?? '', 'export_excel.php');
+        if ($isDownloadOrExport) {
+            http_response_code(401);
+            die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>401 — غير مصرح</h2><p>انتهت الجلسة. يرجى تسجيل الدخول مجدداً.</p></div>');
+        }
         header('Location: index.php');
         exit;
     }
+
+    // Check Session Idle Timeout (default 1800s = 30 mins)
+    $idleTimeout = (int)(getenv('SESSION_IDLE_TIMEOUT') ?: ($_ENV['SESSION_IDLE_TIMEOUT'] ?? 1800));
+    if ($idleTimeout < 60) {
+        $idleTimeout = 1800;
+    }
+
+    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > $idleTimeout)) {
+        destroySessionAndCookie();
+        
+        $isDownloadOrExport = str_contains($_SERVER['PHP_SELF'] ?? '', 'download_file.php') 
+                           || str_contains($_SERVER['PHP_SELF'] ?? '', 'export_pdf.php') 
+                           || str_contains($_SERVER['PHP_SELF'] ?? '', 'export_excel.php');
+        if ($isDownloadOrExport) {
+            http_response_code(401);
+            die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>401 — انتهت مدة الجلسة</h2><p>انتهت مدة الجلسة بسبب عدم النشاط. يرجى إعادة تسجيل الدخول.</p></div>');
+        }
+        
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['flash'] = ['type' => 'warning', 'message' => 'انتهت مدة الجلسة بسبب عدم النشاط. يرجى إعادة تسجيل الدخول.'];
+        header('Location: index.php?expired=1');
+        exit;
+    }
+
+    $_SESSION['last_activity'] = time();
 }
 
 function requireRole(array $roles): void {

@@ -29,9 +29,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $role_sel = $_POST['role'] ?? '';
 
-    // Privacy-conscious IP hashing using REMOTE_ADDR
+    // Privacy-conscious IP hashing using REMOTE_ADDR and env secret
     $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-    $secret = getenv('RATE_LIMIT_SECRET') ?: 'alasafy_rate_limit_secret_salt_2026';
+    $secret = getenv('RATE_LIMIT_SECRET') ?: ($_ENV['RATE_LIMIT_SECRET'] ?? '');
+
+    if (empty($secret) || strlen($secret) < 32) {
+        error_log("SECURITY CRITICAL CONFIG ERROR: RATE_LIMIT_SECRET is not configured or is under 32 characters.");
+        http_response_code(503);
+        die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>503 — خدمة تسجيل الدخول غير متاحة</h2><p>حدث خطأ في الإعدادات الأمنية للنظام. يرجى مراجعة مسؤول النظام.</p></div>');
+    }
     $ipHash = hash_hmac('sha256', $ip, $secret);
 
     // Helper functions for persistent rate limiting

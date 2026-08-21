@@ -6,6 +6,12 @@ require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/logger.php';
 
+$appEnv = strtolower(trim(getenv('APP_ENV') ?: ($_ENV['APP_ENV'] ?? 'production')));
+if (!in_array($appEnv, ['development', 'local', 'testing'], true)) {
+    http_response_code(404);
+    die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>404 — الصفحة غير موجودة</h2><p>هذه أداة تطوير وغير متاحة في بيئة الإنتاج.</p></div>');
+}
+
 requireRole(['admin']);
 $pdo = getPDO();
 
