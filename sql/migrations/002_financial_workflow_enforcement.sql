@@ -2,9 +2,8 @@
 -- 002_financial_workflow_enforcement.sql
 -- Migration: Add missing permissions, columns, unique keys,
 -- and indexes for strict approval workflow enforcement.
+-- Environment-agnostic (No hardcoded USE database statement)
 -- ============================================================
-
-USE `alasisfh_al_asafy_deposits`;
 
 -- 1. Ensure new permissions exist
 INSERT IGNORE INTO `permissions` (`name`, `label_ar`, `category`) VALUES

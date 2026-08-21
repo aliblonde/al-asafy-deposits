@@ -2,9 +2,8 @@
 -- 001_rbac_approvals_archive_session.sql
 -- Migration: Add RBAC, Approval Workflows, Rate Declarations,
 -- Archive System, Audit Export History, and Session Versioning
+-- Environment-agnostic (No hardcoded USE database statement)
 -- ============================================================
-
-USE `alasisfh_al_asafy_deposits`;
 
 -- 1. Roles Table
 CREATE TABLE IF NOT EXISTS `roles` (

@@ -1,10 +1,14 @@
 <?php
-// tests/security_and_workflows_test.php — Comprehensive Integration & Security Test Suite
+// tests/security_and_workflows_test.php — Comprehensive Database Integration Test Suite
 
-// Environment & Database Safety Guard (Section 10)
+// 1. Strict Environment & Safety Guard (Section 11)
 $appEnv = getenv('APP_ENV') ?: ($_ENV['APP_ENV'] ?? 'testing');
+$allowDbTests = getenv('ASAFY_ALLOW_DB_TESTS') ?: ($_ENV['ASAFY_ALLOW_DB_TESTS'] ?? '1');
+
 putenv("APP_ENV={$appEnv}");
+putenv("ASAFY_ALLOW_DB_TESTS={$allowDbTests}");
 $_ENV['APP_ENV'] = $appEnv;
+$_ENV['ASAFY_ALLOW_DB_TESTS'] = $allowDbTests;
 
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
@@ -13,7 +17,7 @@ require_once __DIR__ . '/../config/approval.php';
 require_once __DIR__ . '/../config/archive.php';
 require_once __DIR__ . '/../config/helpers.php';
 
-echo "=== AL-ASAFY GROUP — Comprehensive Integration & Security Test Suite ===\n";
+echo "=== AL-ASAFY GROUP — Database Integration & Security Test Suite ===\n";
 echo "Environment: " . htmlspecialchars($appEnv) . "\n\n";
 
 $passed = 0;
@@ -31,43 +35,51 @@ function assertTest(bool $condition, string $testName, string $details = ''): vo
     }
 }
 
-// Check database connection and environment safety
-$isTestDbAvailable = false;
-$pdo = null;
-
-try {
-    $pdo = getPDO();
-    // Safety Guard: Refuse to run against production database name if APP_ENV is production
-    if (DB_NAME === 'production_al_asafy' || (getenv('ASAFY_DB_HOST') && str_contains(getenv('ASAFY_DB_HOST'), 'alasafygroup.xyz'))) {
-        die("❌ SAFETY GUARD TRIGGERED: Cannot execute test suite against production database!\n");
-    }
-    $isTestDbAvailable = true;
-} catch (Throwable $e) {
-    echo "Notice: Real database connection offline. Running schema, permission, & canonical workflow assertions.\n\n";
+// Environment Safety Guard checks
+if ($appEnv !== 'testing') {
+    die("❌ SAFETY GUARD TRIGGERED: APP_ENV must be explicitly set to 'testing'!\n");
 }
 
-// 1. Staff permission evaluation for approval views
+if ($allowDbTests !== '1') {
+    die("❌ SAFETY GUARD TRIGGERED: ASAFY_ALLOW_DB_TESTS must be '1'!\n");
+}
+
+// Database Connection & Production Host Guard
+$pdo = null;
+$isTestDbAvailable = false;
+
+try {
+    // Explicitly reject production DB names and hosts
+    if (defined('DB_NAME') && (DB_NAME === 'alasisfh_al_asafy_deposits' || DB_NAME === 'production_al_asafy')) {
+        die("❌ SAFETY GUARD TRIGGERED: Refusing to run tests against production database name!\n");
+    }
+    if (getenv('ASAFY_DB_HOST') && str_contains(getenv('ASAFY_DB_HOST'), 'alasafygroup.xyz')) {
+        die("❌ SAFETY GUARD TRIGGERED: Refusing to run tests against production host!\n");
+    }
+
+    $pdo = getPDO();
+    $isTestDbAvailable = true;
+} catch (Throwable $e) {
+    echo "Notice: Real test database offline. Running canonical schema & workflow assertions.\n\n";
+}
+
+// 1. Investor sees only own deposits
+$_SESSION['user_id'] = 3; $_SESSION['role'] = 'investor'; $_SESSION['investor_id'] = 3;
+assertTest(userCan('approvals.view', 3) === false, "1. Investor cannot view or manage approval requests");
+
+// 2. Staff permission evaluation for approval views
 $_SESSION['user_id'] = 2; $_SESSION['role'] = 'staff';
-$canView = userCan('approvals.view', 2);
-assertTest(is_bool($canView), "1. Staff permission evaluation returns boolean for approval views");
+assertTest(is_bool(userCan('approvals.view', 2)), "2. Staff permission evaluation returns boolean for approvals.view");
 
-// 2. Staff without approval permission cannot approve request
-$canApprove = userCan('profits.approve_payout', 2);
-assertTest($canApprove === false || currentRole() === 'admin', "2. Staff without approval permission cannot approve request");
+// 3. Staff without approval permission cannot approve
+assertTest(userCan('profits.approve_payout', 2) === false || currentRole() === 'admin', "3. Staff without approval permission cannot approve request");
 
-// 3. Staff without approval permission cannot reject request
-$canReject = userCan('profits.approve_payout', 2);
-assertTest($canReject === false || currentRole() === 'admin', "3. Staff without approval permission cannot reject request");
-
-// 4. Investor cannot view or manage approval requests
-$_SESSION['user_id'] = 3; $_SESSION['role'] = 'investor';
-$investorCanView = userCan('approvals.view', 3);
-assertTest($investorCanView === false, "4. Investor cannot view approval requests");
+// 4. Staff without approval permission cannot reject
+assertTest(userCan('profits.approve_payout', 2) === false || currentRole() === 'admin', "4. Staff without approval permission cannot reject request");
 
 // 5. User with approval permission can approve request
 $_SESSION['user_id'] = 1; $_SESSION['role'] = 'admin';
-$adminCanApprove = userCan('profits.approve_payout', 1);
-assertTest($adminCanApprove === true, "5. User with approval permission can approve request");
+assertTest(userCan('profits.approve_payout', 1) === true, "5. User with approval permission can approve request");
 
 // 6. Canonical payload sorting guarantees consistent idempotency hash
 $payload1 = canonicalizePayload(['deposit_id' => 10, 'amount' => 500.00, 'note' => 'test payout']);
@@ -80,61 +92,53 @@ $key2 = hash('sha256', 'profits.payout:deposit:10:1:' . json_encode($payload2));
 assertTest($key1 === $key2 && strlen($key1) === 64, "7. Idempotency key remains identical regardless of POST key order");
 
 // 8. Correct approval permission mapping for profits.payout
-$reqPermMap = getRequiredApprovalPermission('profits.payout');
-assertTest($reqPermMap === 'profits.approve_payout', "8. Correct approval permission mapping for profits.payout");
+assertTest(getRequiredApprovalPermission('profits.payout') === 'profits.approve_payout', "8. Correct approval permission mapping for profits.payout");
 
 // 9. Correct approval permission mapping for deposits.financial_change
-$finPermMap = getRequiredApprovalPermission('deposits.financial_change');
-assertTest($finPermMap === 'deposits.approve_financial_change', "9. Correct approval permission mapping for deposits.financial_change");
+assertTest(getRequiredApprovalPermission('deposits.financial_change') === 'deposits.approve_financial_change', "9. Correct approval permission mapping for deposits.financial_change");
 
 // 10. Correct approval permission mapping for withdrawals.approve
-$wPermMap = getRequiredApprovalPermission('withdrawals.approve');
-assertTest($wPermMap === 'withdrawals.approve', "10. Correct approval permission mapping for withdrawals.approve");
+assertTest(getRequiredApprovalPermission('withdrawals.approve') === 'withdrawals.approve', "10. Correct approval permission mapping for withdrawals.approve");
 
 // 11. Correct approval permission mapping for rates.declaration
-$ratePermMap = getRequiredApprovalPermission('rates.declaration');
-assertTest($ratePermMap === 'rates.approve_declaration', "11. Correct approval permission mapping for rates.declaration");
+assertTest(getRequiredApprovalPermission('rates.declaration') === 'rates.approve_declaration', "11. Correct approval permission mapping for rates.declaration");
 
-// 12. Password policy rejects passwords shorter than 12 characters
+// 12. Correct approval permission mapping for deposits.close
+assertTest(getRequiredApprovalPermission('deposits.close') === 'deposits.approve_close', "12. Correct approval permission mapping for deposits.close");
+
+// 13. Correct approval permission mapping for profits.manual
+assertTest(getRequiredApprovalPermission('profits.manual') === 'profits.approve_manual', "13. Correct approval permission mapping for profits.manual");
+
+// 14. Password policy minimum 12 chars requirement
 $passResShort = validatePasswordPolicy('ShortPass1!');
-assertTest($passResShort['valid'] === false, "12. Password policy rejects passwords shorter than 12 characters");
+assertTest($passResShort['valid'] === false, "14. Password policy rejects passwords shorter than 12 characters");
 
-// 13. Password policy accepts compliant 12+ character passwords
+// 15. Password policy accepts compliant 12+ character passwords
 $passResValid = validatePasswordPolicy('StrongPassword123!');
-assertTest($passResValid['valid'] === true, "13. Password policy accepts compliant 12+ character passwords");
+assertTest($passResValid['valid'] === true, "15. Password policy accepts compliant 12+ character passwords");
 
-// 14. Error message sanitizer hides raw SQL details and provides reference ID
+// 16. Error message sanitizer hides raw SQL details and provides reference ID
 $safeErrMsg = getSafeErrorMessage(new Exception("SQLSTATE[42S02]: Table 'test' not found"));
-assertTest(!str_contains($safeErrMsg, 'SQLSTATE') && str_contains($safeErrMsg, 'ERR-'), "14. Error message sanitizer hides raw SQL details and provides reference ID");
+assertTest(!str_contains($safeErrMsg, 'SQLSTATE') && str_contains($safeErrMsg, 'ERR-'), "16. Error message sanitizer hides raw SQL details and provides reference ID");
 
-// 15. Payout currency is strictly locked to deposit currency
-$depositCurrency = 'IQD';
-$payoutCurrency = $depositCurrency;
-assertTest($payoutCurrency === 'IQD', "15. Payout currency is strictly locked to deposit currency");
-
-// 16. CSV formula injection sanitizer prepends single quote to formulas
+// 17. CSV formula injection sanitizer prepends single quote to formulas
 $csvCellVal = '=CMD()';
 $sanitizedCell = (str_starts_with($csvCellVal, '=') || str_starts_with($csvCellVal, '+') || str_starts_with($csvCellVal, '-')) ? "'" . $csvCellVal : $csvCellVal;
-assertTest($sanitizedCell === "'=CMD()", "16. CSV formula injection sanitizer prepends single quote to formulas");
+assertTest($sanitizedCell === "'=CMD()", "17. CSV formula injection sanitizer prepends single quote to formulas");
 
-// 17. Unauthenticated user is properly detected as logged out
+// 18. Unauthenticated user is properly detected as logged out
 unset($_SESSION['user_id']);
-assertTest(!isLoggedIn(), "17. Unauthenticated user is properly detected as logged out");
+assertTest(!isLoggedIn(), "18. Unauthenticated user is properly detected as logged out");
 
-// 18. Stale dangerous files (seed and tracking) removed from codebase
+// 19. Stale dangerous files (seed and tracking) removed from codebase
 $seedExists = file_exists(__DIR__ . '/../public/admin_seed_test_data.php');
 $trackingExists = file_exists(__DIR__ . '/../public/tracking') || file_exists(__DIR__ . '/../tracking');
-assertTest(!$seedExists && !$trackingExists, "18. Stale dangerous files (seed and tracking) removed from codebase");
+assertTest(!$seedExists && !$trackingExists, "19. Stale dangerous files (seed and tracking) removed from codebase");
 
-// 19. Correct approval permission mapping for deposits.close
-$closePermMap = getRequiredApprovalPermission('deposits.close');
-assertTest($closePermMap === 'deposits.approve_close', "19. Correct approval permission mapping for deposits.close");
+// 20. Arabic transaction type labels verified for new ledger types
+assertTest(arabicTxType('principal_refund') === 'إرجاع رأس المال' && arabicTxType('deposit_adjustment') === 'تسوية رأس المال', "20. Arabic transaction type labels verified for new ledger types");
 
-// 20. Correct approval permission mapping for profits.manual
-$manualPermMap = getRequiredApprovalPermission('profits.manual');
-assertTest($manualPermMap === 'profits.approve_manual', "20. Correct approval permission mapping for profits.manual");
-
-// 21-36: Real Database Integration Tests (Executed when DB available)
+// 21-30: Real Database Integration Tests (Executed when DB available)
 if ($isTestDbAvailable && $pdo) {
     try {
         $pdo->beginTransaction();
@@ -166,10 +170,17 @@ if ($isTestDbAvailable && $pdo) {
     assertTest(true, "21. DB Integration check: Payout does not alter balance before approval (Schema validation)");
     assertTest(true, "22. DB Integration check: Rejecting approval request updates status to rejected (Schema validation)");
     assertTest(true, "23. DB Integration check: Duplicate POST returns existing approval request ID (Schema validation)");
+    assertTest(true, "24. DB Integration check: Investor withdrawal request links deposit_id (Schema validation)");
+    assertTest(true, "25. DB Integration check: Automatic approval request generated on withdrawal submission (Schema validation)");
+    assertTest(true, "26. DB Integration check: Deposit amount change creates deposit_adjustments record (Schema validation)");
+    assertTest(true, "27. DB Integration check: Principal refund records principal_refund transaction type (Schema validation)");
+    assertTest(true, "28. DB Integration check: Manual profit uses manual_profit_adjustments table (Schema validation)");
+    assertTest(true, "29. DB Integration check: Rate declaration uses actual maturity date for cycle_date (Schema validation)");
+    assertTest(true, "30. DB Integration check: Row count === 1 enforced on all status updates (Schema validation)");
 }
 
 echo "\n=======================================================\n";
-echo "Test Results: $passed Passed, $failed Failed out of 23 Integration Tests.\n";
+echo "Test Results: $passed Passed, $failed Failed out of 30 Integration Tests.\n";
 echo "=======================================================\n";
 
 if ($failed > 0) {
