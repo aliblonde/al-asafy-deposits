@@ -24,9 +24,8 @@ function userCan(string $permissionName, ?int $userId = null): bool
         return true; // Admin possesses universal permissions
     }
 
-    $pdo = getPDO();
-
     try {
+        $pdo = getPDO();
         // 1. Check explicit user_permissions overrides
         $stmt = $pdo->prepare("
             SELECT up.permission_type 
@@ -55,8 +54,12 @@ function userCan(string $permissionName, ?int $userId = null): bool
         ");
         $stmtRole->execute([$role, $permissionName]);
         return ((int)$stmtRole->fetchColumn()) > 0;
-    } catch (Exception $e) {
-        error_log("userCan check error: " . $e->getMessage());
+    } catch (Throwable $e) {
+        error_log("userCan check notice: " . $e->getMessage());
+        // Fallback for staff role offline checks
+        if ($role === 'staff' && str_starts_with($permissionName, 'profits.approve')) {
+            return false;
+        }
         return false;
     }
 }
