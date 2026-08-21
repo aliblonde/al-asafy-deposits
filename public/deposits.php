@@ -142,7 +142,7 @@ include __DIR__ . '/../includes/header.php';
                         onclick="return confirm('هل أنت متأكد من رغبتك في الانتقال لصفحة صرف أرباح جميع الودائع؟');">
                         <i class="bi bi-cash-stack me-1"></i> صرف أرباح الكل
                     </a>
-                    <a href="/al-asafy-deposits/public/deposit_add.php" class="btn btn-gold">
+                    <a href="deposit_add.php" class="btn btn-gold">
                         <i class="bi bi-plus-lg me-1"></i> إضافة وديعة
                     </a>
                 </div>

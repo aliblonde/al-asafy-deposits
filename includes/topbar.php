@@ -21,7 +21,7 @@
         <span class="badge" style="background:rgba(212,175,55,0.15);color:var(--gold);font-size:0.7rem">
             <?= currentRole() === 'admin' ? 'مشرف' : 'موظف' ?>
         </span>
-        <a href="/logout.php" class="btn-logout">
+        <a href="logout.php" class="btn-logout">
             <i class="bi bi-box-arrow-left"></i> خروج
         </a>
     </div>

@@ -121,7 +121,7 @@ include __DIR__ . '/../includes/header.php';
                         <?= date('d/m/Y') ?>
                     </p>
                 </div>
-                <a href="/deposit_add.php" class="btn btn-gold">
+                <a href="deposit_add.php" class="btn btn-gold">
                     <i class="bi bi-plus-lg me-1"></i> إضافة وديعة
                 </a>
             </div>

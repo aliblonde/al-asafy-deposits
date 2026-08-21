@@ -183,7 +183,10 @@ include __DIR__ . '/../includes/header.php';
                                 </div>
                             </div>
                         </div>
-                        <div class="mt-3 text-start">
+                        <div class="mt-3 text-start d-flex gap-2">
+                            <a href="deposit_add.php?investor_id=<?= $id ?>" class="btn btn-gold btn-sm">
+                                <i class="bi bi-plus-circle me-1"></i> إضافة وديعة لهذا المستثمر
+                            </a>
                             <a href="reports.php?report=investor_statement&investor_id=<?= $id ?>"
                                 class="btn btn-outline-gold btn-sm">
                                 <i class="bi bi-file-earmark-text me-1"></i>عرض كشف الحساب المفصل

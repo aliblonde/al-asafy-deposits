@@ -13,6 +13,7 @@ $investors = $pdo->query("SELECT id, full_name FROM investors ORDER BY full_name
 $depositTypes = $pdo->query("SELECT * FROM deposit_types ORDER BY min_days")->fetchAll();
 
 $editId = (int)($_GET['edit'] ?? 0);
+$getInvestorId = (int)($_GET['investor_id'] ?? 0);
 $deposit = null;
 $form = [];
 
@@ -22,10 +23,12 @@ if ($editId) {
     $deposit = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$deposit) {
         setFlash('danger', 'الوديعة غير موجودة.');
-        header('Location: /deposits.php');
+        header('Location: deposits.php');
         exit;
     }
     $form = $deposit;
+} elseif ($getInvestorId) {
+    $form['investor_id'] = $getInvestorId;
 }
 
 $errors = [];
@@ -117,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 setFlash('success', "تم تعديل بيانات الوديعة بنجاح!");
-                header('Location: /deposits.php');
+                header('Location: deposits.php');
                 exit;
 
             } else {
@@ -165,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
 
                 setFlash('success', "تمت إضافة الوديعة بنجاح! رقم الإيصال: $receiptNo");
-                header('Location: /deposits.php');
+                header('Location: deposits.php');
                 exit;
             }
 
