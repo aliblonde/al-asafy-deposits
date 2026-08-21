@@ -111,69 +111,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             if ($editId) {
-                // EDIT EXISTING DEPOSIT: Financial changes MUST create an Approval Request
-                $isFinancialChange = (
-                    (float)$deposit['amount'] !== $amount ||
-                    $deposit['currency'] !== $form['currency'] ||
-                    (int)$deposit['investor_id'] !== $form['investor_id'] ||
-                    (int)$deposit['deposit_type_id'] !== $form['deposit_type_id']
+                // ALL EDIT FIELDS ARE FINANCIAL/IMPACTING: MUST Create Approval Request (NO direct UPDATE path)
+                $payload = [
+                    'deposit_id' => $editId,
+                    'new_investor_id' => $form['investor_id'],
+                    'new_deposit_type_id' => $form['deposit_type_id'],
+                    'new_amount' => $amount,
+                    'new_currency' => $form['currency'],
+                    'new_start_date' => $startDateStr,
+                    'new_end_date' => $endDateStr,
+                    'new_profit_payout_frequency' => $payoutFrequency
+                ];
+
+                $reqId = createApprovalRequest(
+                    $pdo,
+                    'deposits.financial_change',
+                    'deposit',
+                    $editId,
+                    $payload,
+                    $deposit
                 );
 
-                if ($isFinancialChange) {
-                    $payload = [
-                        'deposit_id' => $editId,
-                        'new_amount' => $amount,
-                        'new_currency' => $form['currency'],
-                        'new_investor_id' => $form['investor_id'],
-                        'new_deposit_type_id' => $form['deposit_type_id'],
-                        'start_date' => $startDateStr,
-                        'end_date' => $endDateStr,
-                        'payout_frequency' => $payoutFrequency
-                    ];
-
-                    $reqId = createApprovalRequest(
-                        $pdo,
-                        'deposits.financial_change',
-                        'deposit',
-                        $editId,
-                        $payload,
-                        $deposit
-                    );
-
-                    setFlash('info', 'تم تقديم طلب تعديل البيانات المالية للوديعة رقم #' . $editId . ' (طلب موافقة رقم #' . $reqId . '). لن تتغير البيانات حتى الاعتماد.');
-                    header('Location: deposits.php');
-                    exit;
-                } else {
-                    // Non-financial edits only (dates / payout frequency)
-                    $stmt = $pdo->prepare(
-                        "UPDATE deposits SET start_date=?, end_date=?, profit_payout_frequency=? WHERE id=?"
-                    );
-                    $stmt->execute([
-                        $startDateStr,
-                        $endDateStr,
-                        $payoutFrequency,
-                        $editId
-                    ]);
-
-                    logActivity($pdo, 'UPDATE_DEPOSIT_NON_FINANCIAL', 'deposits', $editId, $deposit, [
-                        'start_date' => $startDateStr,
-                        'end_date' => $endDateStr,
-                        'payout_frequency' => $payoutFrequency
-                    ]);
-
-                    setFlash('success', 'تم تعديل البيانات غير المالية للوديعة بنجاح.');
-                    header('Location: deposits.php');
-                    exit;
-                }
+                setFlash('info', 'تم تقديم طلب تعديل بيانات الوديعة رقم #' . $editId . ' (طلب موافقة رقم #' . $reqId . '). لن تتغير البيانات حتى الاعتماد.');
+                header('Location: deposits.php');
+                exit;
 
             } else {
                 // CREATE NEW DEPOSIT (Initial creation transaction)
                 $pdo->beginTransaction();
 
-                $stmt = $pdo->prepare(
-                    "INSERT INTO deposits (investor_id, deposit_type_id, amount, currency, start_date, end_date, profit_payout_frequency, accumulated_profit, paid_profit, principal_refunded, status, created_by, created_at)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, 0.00, 0.00, 0, 'active', ?, NOW())"
-                );
+                $stmt = $pdo->prepare("
+                    INSERT INTO deposits (
+                        investor_id, deposit_type_id, amount, currency, start_date, end_date,
+                        profit_payout_frequency, accumulated_profit, paid_profit, principal_refunded, status, created_by, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0.00, 0.00, 0, 'active', ?, NOW())
+                ");
                 $stmt->execute([
                     $form['investor_id'],
                     $form['deposit_type_id'],
@@ -187,10 +159,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $depositId = (int)$pdo->lastInsertId();
 
                 $receiptNo = generateReceiptNo($pdo);
-                $pdo->prepare(
-                    "INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
-                     VALUES (?, ?, ?, 'deposit', ?, ?, NOW(), ?)"
-                )->execute([
+                $pdo->prepare("
+                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
+                    VALUES (?, ?, ?, 'deposit', ?, ?, NOW(), ?)
+                ")->execute([
                     $receiptNo,
                     $form['investor_id'],
                     $depositId,
@@ -327,7 +299,7 @@ include __DIR__ . '/../includes/header.php';
                             <div class="d-flex gap-2 justify-content-end">
                                 <a href="deposits.php" class="btn btn-outline-gold">إلغاء</a>
                                 <button type="submit" class="btn btn-gold px-4">
-                                    <i class="bi bi-save me-1"></i> <?= $editId ? 'حفظ التعديلات' : 'حفظ الوديعة' ?>
+                                    <i class="bi bi-save me-1"></i> <?= $editId ? 'إرسال طلب التعديل للموافقة' : 'حفظ الوديعة' ?>
                                 </button>
                             </div>
                         </form>
