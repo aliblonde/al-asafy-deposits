@@ -205,10 +205,10 @@ include __DIR__ . '/../includes/header.php';
                         <div class="mb-4">
                             <label class="form-label d-block small mb-2">عقد المستثمر</label>
                             <?php if ($investor['contract_path']): ?>
-                                <a href="/al-asafy-deposits/<?= $investor['contract_path'] ?>" target="_blank"
+                                <a href="download_file.php?investor_id=<?= $id ?>&type=contract"
                                     class="btn btn-outline-gold w-100 py-3">
                                     <i class="bi bi-file-pdf fs-3 d-block mb-1"></i>
-                                    <span>استعراض العقد</span>
+                                    <span>تحميل/استعراض العقد</span>
                                 </a>
                             <?php else: ?>
                                 <div class="alert alert-secondary py-3 text-center small mb-0">
@@ -220,10 +220,10 @@ include __DIR__ . '/../includes/header.php';
                         <div class="mb-2">
                             <label class="form-label d-block small mb-2">هوية المستثمر</label>
                             <?php if ($investor['id_card_path']): ?>
-                                <a href="/al-asafy-deposits/<?= $investor['id_card_path'] ?>" target="_blank"
+                                <a href="download_file.php?investor_id=<?= $id ?>&type=id_card"
                                     class="btn btn-outline-gold w-100 py-3">
                                     <i class="bi bi-person-vcard fs-3 d-block mb-1"></i>
-                                    <span>استعراض الهوية</span>
+                                    <span>تحميل/استعراض الهوية</span>
                                 </a>
                             <?php else: ?>
                                 <div class="alert alert-secondary py-3 text-center small mb-0">

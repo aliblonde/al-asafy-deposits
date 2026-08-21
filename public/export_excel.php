@@ -10,6 +10,9 @@ $pdo = getPDO();
 
 $report = $_GET['report'] ?? 'transactions';
 $investorId = (int) ($_GET['investor_id'] ?? 0);
+if (currentRole() === 'investor') {
+    $investorId = (int) currentInvestorId();
+}
 $dateFrom = $_GET['date_from'] ?? '';
 $dateTo = $_GET['date_to'] ?? '';
 $receiptNo = trim($_GET['receipt_no'] ?? '');

@@ -1,28 +1,46 @@
-# Hardened Security Configuration for Al-Asafy Deposits System
+# ==============================================================================
+# AL-ASAFY GROUP — Modern Hardened Apache 2.4 Security & Routing Rules
+# ==============================================================================
 
-# Disable Directory Browsing
+# Disable Directory Indexing
 Options -Indexes
 
-# Prevent access to sensitive files
-<FilesMatch "\.(log|sql|md|jsonl|env|git|sh|htaccess|htpasswd)$">
-    Order allow,deny
-    Deny from all
+# Prevent access to sensitive backup, config, log, and documentation files (Apache 2.4)
+<FilesMatch "\.(log|sql|md|jsonl|env|git|sh|htaccess|htpasswd|bak|old|gz|zip)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
 </FilesMatch>
 
 # Block web access to internal application directories
 RedirectMatch 403 ^/(config|includes|brain|logs|sql)/
 
-# Security HTTP Headers
+# Comprehensive Security HTTP Headers
 <IfModule mod_headers.c>
+    # HTTP Strict Transport Security (HSTS)
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+
+    # Content Security Policy (CSP) tuned for Bootstrap, Bootstrap Icons & Google Fonts
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' data:; frame-ancestors 'self';"
+
+    # Anti-Sniffing & Clickjacking Protections
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
-    Header set X-XSS-Protection "1; mode=block"
     Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+    # Remove Server Header Disclosures
+    Header unset X-Powered-By
+    Header unset Server
 </IfModule>
 
-# URL Rewriting for public folder fallback if accessed without public/
+# URL Routing: Map requests seamlessly to public/ folder
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{REQUEST_URI} !^/public/
-    RewriteRule ^(.*)$ /public/$1 [L]
+    RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>

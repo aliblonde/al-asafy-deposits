@@ -22,19 +22,12 @@ INSERT INTO `investors` (`full_name`, `phone`, `city`, `national_id`) VALUES
 ('خالد عمر القحطاني',  '0501234563', 'الدمام',  '1012345673');
 
 -- -------------------------------------------------------
--- Users  (passwords hashed with PHP password_hash DEFAULT)
--- admin    → Admin@123
--- staff    → Staff@123
--- investor1→ Investor@123
+-- Users  (Initial default accounts - passwords MUST be set via admin interface)
 -- -------------------------------------------------------
 INSERT INTO `users` (`investor_id`, `role`, `username`, `password_hash`) VALUES
 (NULL, 'admin',    'admin',     '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'),
 (NULL, 'staff',    'staff',     '$2y$12$c.jTNn85xVS5HQXQ0yXyEuJkX7vlTOb7p6KFPD0LoW.C5AjjSREW'),
 (1,    'investor', 'investor1', '$2y$12$u6BGGH.ykexwgENdnRdCsORJg2e4JkXz4lnJjN.eV/gIagcuqlveG');
-
--- NOTE: If the above hashes don't match your PHP version, run this regeneration script
--- once after import (see setup guide in walkthrough). Alternatively import and visit
--- /al-asafy-deposits/public/setup_passwords.php (temporary helper, delete after use).
 
 -- -------------------------------------------------------
 -- Sample Deposits (varied dates for alerts + due profits)

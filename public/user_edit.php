@@ -2,6 +2,7 @@
 // public/user_edit.php — Edit Staff/Admin User
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
 
@@ -25,6 +26,7 @@ if (!$user) {
 $pageTitle = 'تعديل بيانات الموظف: ' . htmlspecialchars($user['username']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrf();
     $role = $_POST['role'] ?? $user['role'];
     $password = $_POST['password'] ?? '';
 
@@ -44,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // If password provided, update it
             if (!empty($password)) {
-                if (strlen($password) < 6) {
-                    throw new Exception('كلمة المرور يجب أن تكون 6 أحرف على الأقل.');
+                if (strlen($password) < 10) {
+                    throw new Exception('كلمة المرور يجب أن تكون 10 أحرف على الأقل.');
                 }
                 $hash = password_hash($password, PASSWORD_DEFAULT);
                 $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
@@ -100,6 +102,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
         <div class="form-card mx-auto" style="max-width: 600px;">
             <form method="POST">
+                <?= csrfField() ?>
                 <div class="mb-4">
                     <label class="form-label">اسم المستخدم</label>
                     <input type="text" class="form-control" value="<?= htmlspecialchars($user['username']) ?>" disabled>

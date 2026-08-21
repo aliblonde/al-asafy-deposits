@@ -179,11 +179,11 @@ $pageTitle = 'بوابة المستثمر';
             <span class="user-name">
                 <?= htmlspecialchars($investorName) ?>
             </span>
-            <a href="/change_password.php" class="btn btn-sm btn-outline-gold border-0 me-2"
+            <a href="change_password.php" class="btn btn-sm btn-outline-gold border-0 me-2"
                 title="تغيير كلمة المرور">
                 <i class="bi bi-shield-lock"></i>
             </a>
-            <a href="/logout.php" class="btn-logout">
+            <a href="logout.php" class="btn-logout">
                 <i class="bi bi-box-arrow-left"></i> خروج
             </a>
         </div>
@@ -203,14 +203,14 @@ $pageTitle = 'بوابة المستثمر';
                 </p>
             </div>
             <div class="d-flex gap-2">
-                <a href="/change_password.php" class="btn btn-gold btn-sm">
+                <a href="change_password.php" class="btn btn-gold btn-sm">
                     <i class="bi bi-shield-lock me-1"></i>تغيير كلمة المرور
                 </a>
-                <a href="/export_pdf.php?investor_id=<?= $investorId ?>&report=investor_statement"
+                <a href="export_pdf.php?investor_id=<?= $investorId ?>&report=investor_statement"
                     class="btn btn-outline-gold btn-sm" target="_blank">
                     <i class="bi bi-file-pdf me-1"></i>PDF
                 </a>
-                <a href="/export_excel.php?investor_id=<?= $investorId ?>&report=investor_statement"
+                <a href="export_excel.php?investor_id=<?= $investorId ?>&report=investor_statement"
                     class="btn btn-outline-gold btn-sm">
                     <i class="bi bi-file-excel me-1"></i>Excel
                 </a>
