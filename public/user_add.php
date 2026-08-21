@@ -2,6 +2,7 @@
 // public/user_add.php — Add Staff/Admin User
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
 
@@ -12,6 +13,7 @@ $pageTitle = 'إضافة موظف جديد';
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrf();
     $username = trim($_POST['username'] ?? '');
     $role = $_POST['role'] ?? 'staff';
     $password = $_POST['password'] ?? '';
@@ -19,8 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Validation
     if (strlen($username) < 3)
         $errors[] = 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل.';
-    if (strlen($password) < 6)
-        $errors[] = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.';
+    if (strlen($password) < 10)
+        $errors[] = 'كلمة المرور يجب أن تكون 10 أحرف على الأقل.';
     if (!in_array($role, ['admin', 'staff']))
         $errors[] = 'صلاحية غير صحيحة.';
 
@@ -83,6 +85,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
         <div class="form-card mx-auto" style="max-width: 600px;">
             <form method="POST">
+                <?= csrfField() ?>
                 <div class="mb-4">
                     <label class="form-label">اسم المستخدم</label>
                     <input type="text" name="username" class="form-control" required

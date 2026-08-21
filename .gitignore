@@ -1,8 +1,26 @@
-# Temporary and debug files
+# Environment and secret files
+.env
+.env.*
+!.env.example
+credentials.md
+*.credentials
+
+# Logs and error logs
+*.log
+error_log
+public/error_log
+logs/
+
+# Backups and temporary files
+*.bak
+*.old
+*.zip
+*.tar
+*.gz
+*.sql.gz
 debug_*.json
 debug_*.txt
-*.zip
-*.log
+schema_dump.txt
 
 # Operating system files
 .DS_Store
@@ -16,3 +34,5 @@ desktop.ini
 # Uploads directory contents (preserve folder structure)
 /uploads/*
 !/uploads/.gitkeep
+/public/uploads/*
+!/public/uploads/.gitkeep

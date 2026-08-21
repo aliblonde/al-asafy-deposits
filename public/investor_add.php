@@ -35,15 +35,25 @@ $idCardCurrent = $old['id_card_path'] ?? '';
 // ── Handle File Uploads ────────────────────────────────────────────────
 function handleUpload($fileKey, $targetDir, $currentPath = '')
 {
-  if (empty($_FILES[$fileKey]['name']))
+  if (!isset($_FILES[$fileKey]) || $_FILES[$fileKey]['error'] === UPLOAD_ERR_NO_FILE || empty($_FILES[$fileKey]['name'])) {
     return $currentPath;
+  }
 
   $file = $_FILES[$fileKey];
-  $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-  $allowed = ['pdf', 'jpg', 'jpeg', 'png'];
 
-  if (!in_array($ext, $allowed)) {
+  if ($file['error'] !== UPLOAD_ERR_OK) {
+    throw new Exception("حدث خطأ أثناء رفع الملف ($fileKey). كود الخطأ: " . (int)$file['error']);
+  }
+
+  $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+  $allowedExts = ['pdf', 'jpg', 'jpeg', 'png'];
+
+  if (!in_array($ext, $allowedExts, true)) {
     throw new Exception("نوع ملف غير مسموح به لـ $fileKey. المسموح: PDF, JPG, PNG");
+  }
+
+  if ($file['size'] > 5 * 1024 * 1024) { // 5MB
+    throw new Exception("حجم الملف كبير جداً. الحد الأقصى 5MB.");
   }
 
   // MIME Type Validation Guard
@@ -52,17 +62,27 @@ function handleUpload($fileKey, $targetDir, $currentPath = '')
     $mimeType = finfo_file($finfo, $file['tmp_name']);
     finfo_close($finfo);
     $allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/pjpeg'];
-    if (!in_array($mimeType, $allowedMimes)) {
+    if (!in_array($mimeType, $allowedMimes, true)) {
       throw new Exception("محتوى الملف غير صالح لـ $fileKey.");
     }
   }
 
-  if ($file['size'] > 5 * 1024 * 1024) { // 5MB
-    throw new Exception("حجم الملف كبير جداً. الحد الأقصى 5MB.");
+  // Image Parser Integrity Validation for images
+  if (in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+    $imageInfo = @getimagesize($file['tmp_name']);
+    if ($imageInfo === false) {
+      throw new Exception("الملف المرفوع لـ $fileKey ليس صورة صالحة.");
+    }
   }
 
-  $newName = uniqid('inv_', true) . '.' . $ext;
-  $dest = $targetDir . $newName;
+  // Cryptographically random filename
+  $randomName = 'inv_doc_' . bin2hex(random_bytes(16)) . '.' . $ext;
+  $dest = $targetDir . $randomName;
+
+  $fullTargetDir = __DIR__ . '/../' . $targetDir;
+  if (!is_dir($fullTargetDir)) {
+    mkdir($fullTargetDir, 0755, true);
+  }
 
   if (move_uploaded_file($file['tmp_name'], __DIR__ . '/../' . $dest)) {
     return $dest;

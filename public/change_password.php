@@ -2,6 +2,7 @@
 // public/change_password.php — Allow any logged-in user to change their own password
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
 
@@ -13,6 +14,7 @@ $errors = [];
 $success = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrf();
     $currentPwd = $_POST['current_password'] ?? '';
     $newPwd = $_POST['new_password'] ?? '';
     $confirmPwd = $_POST['confirm_password'] ?? '';
@@ -24,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$user || !password_verify($currentPwd, $user['password_hash'])) {
         $errors[] = 'كلمة المرور الحالية غير صحيحة.';
-    } elseif (strlen($newPwd) < 6) {
-        $errors[] = 'كلمة المرور الجديدة يجب أن تكون 6 خانات على الأقل.';
+    } elseif (strlen($newPwd) < 10) {
+        $errors[] = 'كلمة المرور الجديدة يجب أن تكون 10 خانات على الأقل.';
     } elseif ($newPwd !== $confirmPwd) {
         $errors[] = 'كلمة المرور الجديدة غير متطابقة مع تأكيد كلمة المرور.';
     }
@@ -100,6 +102,7 @@ $isInvestor = (currentRole() === 'investor');
 
             <div class="form-card mx-auto shadow-lg" style="max-width: 500px; border: 1px solid var(--border)">
                 <form method="POST">
+                    <?= csrfField() ?>
                     <div class="mb-3">
                         <label class="form-label">كلمة المرور الحالية</label>
                         <input type="password" name="current_password" class="form-control" required>
@@ -107,7 +110,7 @@ $isInvestor = (currentRole() === 'investor');
                     <hr class="my-4" style="border-color: var(--border); opacity:0.5">
                     <div class="mb-3">
                         <label class="form-label">كلمة المرور الجديدة</label>
-                        <input type="password" name="new_password" class="form-control" placeholder="6 خانات على الأقل"
+                        <input type="password" name="new_password" class="form-control" placeholder="10 خانات على الأقل"
                             required>
                     </div>
                     <div class="mb-4">
