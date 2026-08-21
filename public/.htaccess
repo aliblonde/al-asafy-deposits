@@ -1,0 +1,36 @@
+# ==============================================================================
+# AL-ASAFY GROUP — Document Root Security & Headers Configuration (public/.htaccess)
+# ==============================================================================
+
+# Disable Directory Indexing
+Options -Indexes
+
+# Prevent access to sensitive backup, config, log, and documentation files (Apache 2.4)
+<FilesMatch "\.(log|sql|md|jsonl|env|git|sh|htaccess|htpasswd|bak|old|gz|zip)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Comprehensive Security HTTP Headers (Applied to PHP & Static Assets)
+<IfModule mod_headers.c>
+    # HTTP Strict Transport Security (HSTS)
+    Header always set Strict-Transport-Security "max-age=31536000"
+
+    # Content Security Policy (CSP) tuned for Bootstrap, Bootstrap Icons & Google Fonts
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' data:; frame-ancestors 'self';"
+
+    # Anti-Sniffing & Clickjacking Protections
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+    # Minimize Server Header Disclosures
+    Header unset X-Powered-By
+    Header always unset X-Powered-By
+</IfModule>

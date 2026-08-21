@@ -1,30 +1,29 @@
 <?php
-// public/logout.php
+// public/logout.php — Strict POST-only Logout Handler with CSRF Protection
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    verifyCsrf();
-} elseif (isset($_GET['token'])) {
-    if (!hash_equals($_SESSION['csrf_token'] ?? '', $_GET['token'])) {
-        http_response_code(403);
-        die('رمز أمان غير صالح (CSRF).');
-    }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Allow: POST');
+    http_response_code(405);
+    die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>405 — Method Not Allowed</h2><p>تسجيل الخروج يتطلب طلب POST آمن.</p></div>');
 }
+
+verifyCsrf();
 
 if (isLoggedIn()) {
     try {
         $pdo = getPDO();
-        logActivity($pdo, 'LOGOUT', 'users', currentUserId(), null, ['username' => currentUsername()]);
+        logActivity($pdo, 'LOGOUT', 'users', currentUserId(), null, ['role' => currentRole()]);
     } catch (Exception $e) {
-        error_log('Logout audit log error: ' . $e->getMessage());
+        error_log('Logout activity log error: ' . $e->getMessage());
     }
 }
 
-// Complete session & cookie destruction
+// Complete session & cookie destruction with security attributes preserved
 $_SESSION = [];
 if (ini_get('session.use_cookies')) {
     $params = session_get_cookie_params();

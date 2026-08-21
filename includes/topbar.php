@@ -21,8 +21,11 @@
         <span class="badge" style="background:rgba(212,175,55,0.15);color:var(--gold);font-size:0.7rem">
             <?= currentRole() === 'admin' ? 'مشرف' : 'موظف' ?>
         </span>
-        <a href="logout.php" class="btn-logout">
-            <i class="bi bi-box-arrow-left"></i> خروج
-        </a>
+        <form method="POST" action="logout.php" class="d-inline m-0 p-0">
+            <?= csrfField() ?>
+            <button type="submit" class="btn-logout border-0 bg-transparent p-0" style="color:inherit;cursor:pointer">
+                <i class="bi bi-box-arrow-left"></i> خروج
+            </button>
+        </form>
     </div>
 </div>

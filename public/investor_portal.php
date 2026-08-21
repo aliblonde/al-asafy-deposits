@@ -183,9 +183,12 @@ $pageTitle = 'بوابة المستثمر';
                 title="تغيير كلمة المرور">
                 <i class="bi bi-shield-lock"></i>
             </a>
-            <a href="logout.php" class="btn-logout">
-                <i class="bi bi-box-arrow-left"></i> خروج
-            </a>
+            <form method="POST" action="logout.php" class="d-inline m-0 p-0">
+                <?= csrfField() ?>
+                <button type="submit" class="btn-logout border-0 bg-transparent p-0" style="color:inherit;cursor:pointer">
+                    <i class="bi bi-box-arrow-left"></i> خروج
+                </button>
+            </form>
         </div>
     </div>
 
