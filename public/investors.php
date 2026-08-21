@@ -74,7 +74,7 @@ include __DIR__ . '/../includes/header.php';
                                 <th>رقم الهوية</th>
                                 <th>الهاتف</th>
                                 <th>عدد الودائع</th>
-                                <th>الرصيد النشط (ر.س)</th>
+                                <th>الرصيد النشط</th>
                                 <th>تاريخ التسجيل</th>
                                 <?php if (currentRole() === 'admin'): ?>
                                     <th>إجراءات</th>

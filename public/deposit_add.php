@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $amount = (float) $form['amount'];
     if ($amount <= 0 || $amount < 100)
-        $errors[] = 'المبلغ يجب أن يكون 100 ريال أو أكثر.';
+        $errors[] = 'المبلغ يجب أن يكون 100 أو أكثر.';
 
     if (!$form['start_date']) {
         $errors[] = 'يجب تحديد تاريخ البداية.';
