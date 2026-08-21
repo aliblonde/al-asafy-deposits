@@ -184,7 +184,21 @@ function arabicStatus(string $status): string
         'approved' => 'موافق عليها',
         'rejected' => 'مرفوضة',
         'paid' => 'مدفوعة',
+        'executed' => 'منفذة',
         default => $status,
+    };
+}
+
+/** Arabic transaction type label */
+function arabicTxType(string $type): string
+{
+    return match ($type) {
+        'deposit' => 'إيداع جديد',
+        'profit' => 'أرباح مصروفة',
+        'withdraw' => 'سحب أرباح',
+        'principal_refund' => 'إرجاع رأس المال',
+        'deposit_adjustment' => 'تسوية رأس المال',
+        default => $type,
     };
 }
 
