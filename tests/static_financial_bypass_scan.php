@@ -12,17 +12,22 @@ $forbiddenPatterns = [
     'UPDATE deposits status=completed'   => '/UPDATE\s+deposits\s+SET\s+[\s\S]*?status\s*=\s*[\'"]completed[\'"]/is',
     'UPDATE deposits principal_refunded' => '/UPDATE\s+deposits\s+SET\s+[\s\S]*?principal_refunded/is',
     'INSERT INTO transactions'          => '/INSERT\s+INTO\s+transactions/is',
-    'UPDATE withdraw_requests status'    => '/UPDATE\s+withdraw_requests\s+SET\s+[\s\S]*?status\s*=\s*[\'"](approved|paid|executed)[\'"]/is',
+    'UPDATE withdraw_requests to paid'   => '/UPDATE\s+withdraw_requests\s+SET\s+[\s\S]*?status\s*=\s*[\'"](approved|paid|executed)[\'"]/is',
     'INSERT INTO monthly_rates'          => '/INSERT\s+INTO\s+monthly_rates/is',
     'UPDATE monthly_rates'              => '/UPDATE\s+monthly_rates/is',
-    'INSERT INTO profit_cycles'          => '/INSERT\s+INTO\s+profit_cycles/is'
+    'INSERT INTO profit_cycles'          => '/INSERT\s+INTO\s+profit_cycles/is',
+    'INSERT INTO manual_profit_adjustments' => '/INSERT\s+INTO\s+manual_profit_adjustments/is',
+    'INSERT INTO deposit_adjustments'    => '/INSERT\s+INTO\s+deposit_adjustments/is',
 ];
 
-// Whitelisted initial deposit creation in deposit_add.php (sole allowed exception)
-$allowedExceptions = [
+// Whitelisted: deposit_add.php initial deposit creation block ONLY
+// We match the specific context of the allowed INSERT patterns
+$allowedContexts = [
     'deposit_add.php' => [
-        '/INSERT\s+INTO\s+deposits/is',
-        '/INSERT\s+INTO\s+transactions/is'
+        // Pattern 1: Initial deposit INSERT INTO deposits
+        '/INSERT\s+INTO\s+deposits\s*\(/is',
+        // Pattern 2: Initial deposit transaction INSERT INTO transactions (only within 'deposit' type context)
+        "/INSERT\s+INTO\s+transactions\s+[\s\S]*?'deposit'/is",
     ]
 ];
 
@@ -46,17 +51,18 @@ foreach ($files as $file) {
                 $offset = $match[1];
                 $lineNum = substr_count(substr($content, 0, $offset), "\n") + 1;
 
-                // Check if whitelisted exception for this file
-                if (isset($allowedExceptions[$fileName])) {
-                    $isAllowed = false;
-                    foreach ($allowedExceptions[$fileName] as $excPattern) {
-                        if (preg_match($excPattern, $matchedText)) {
-                            $isAllowed = true;
-                            break;
-                        }
-                    }
-                    if ($isAllowed && !str_contains($matchedText, 'accumulated_profit') && !str_contains($matchedText, 'monthly_rates')) {
-                        continue;
+                // Check contextual exceptions for deposit_add.php
+                if ($fileName === 'deposit_add.php') {
+                    // Extract context around the match (200 chars before and after)
+                    $contextStart = max(0, $offset - 200);
+                    $contextEnd = min(strlen($content), $offset + strlen($matchedText) + 200);
+                    $context = substr($content, $contextStart, $contextEnd - $contextStart);
+
+                    // Allow: INSERT INTO deposits (initial creation)
+                    if ($label === 'UPDATE deposits amount' || $label === 'UPDATE deposits currency') {
+                        // Financial change routes through approval engine
+                    } elseif (str_contains($label, 'INSERT INTO transactions') && preg_match("/'deposit'/", $context) && !preg_match("/'(profit|withdraw|profit_accrual|profit_payout|withdrawal_payout|principal_refund|deposit_adjustment)'/", $context)) {
+                        continue; // Allowed: initial deposit transaction
                     }
                 }
 
@@ -74,6 +80,6 @@ if ($violations > 0) {
     echo "❌ AUDIT FAILED: $violations multiline direct financial mutation queries detected in public interface files!\n";
     exit(1);
 } else {
-    echo "✅ AUDIT PASSED: 0 direct financial mutation queries exist in public interface files. All financial executions are centralized in config/approval.php!\n";
+    echo "✅ AUDIT PASSED: 0 direct financial mutation queries exist in public interface files.\n";
     exit(0);
 }

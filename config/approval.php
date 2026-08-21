@@ -134,6 +134,9 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
 
         switch ($opType) {
 
+            // ═══════════════════════════════════════════
+            // profits.payout — Direct Profit Payout
+            // ═══════════════════════════════════════════
             case 'profits.payout':
                 $depositId = (int)($payload['deposit_id'] ?? 0);
                 $amount = (float)($payload['amount'] ?? 0);
@@ -157,10 +160,10 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
 
                 $accumulated = (float)$deposit['accumulated_profit'];
                 if ($amount > $accumulated) {
-                    throw new Exception('المبلغ المطلوب (' . formatMoney($amount, $deposit['currency']) . ') أكبر من رصيد الأرباح المتراكمة المتاح (' . formatMoney($accumulated, $deposit['currency']) . ').');
+                    throw new Exception('المبلغ المطلوب أكبر من رصيد الأرباح المتراكمة المتاح.');
                 }
 
-                $payoutCurrency = $deposit['currency'];
+                $currency = $deposit['currency'];
                 $receiptNo = generateReceiptNo($pdo);
 
                 $upDep = $pdo->prepare("
@@ -176,15 +179,19 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new Exception('فشل تحديث رصيد الوديعة بسبب تعارض تزامن.');
                 }
 
+                // NEW: Use profit_payout type
                 $insTx = $pdo->prepare("
-                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
-                    VALUES (?, ?, ?, 'profit', ?, ?, NOW(), ?)
+                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, direction, amount, currency, approval_request_id, date, note)
+                    VALUES (?, ?, ?, 'profit_payout', 'debit', ?, ?, ?, NOW(), ?)
                 ");
-                $insTx->execute([$receiptNo, $deposit['investor_id'], $depositId, $amount, $payoutCurrency, $note]);
+                $insTx->execute([$receiptNo, $deposit['investor_id'], $depositId, $amount, $currency, $requestId, $note]);
                 $txId = (int)$pdo->lastInsertId();
                 $execRef = 'TX-' . $txId . ' / ' . $receiptNo;
                 break;
 
+            // ═══════════════════════════════════════════
+            // deposits.close — Principal Refund
+            // ═══════════════════════════════════════════
             case 'deposits.close':
                 $depositId = (int)($payload['deposit_id'] ?? 0);
 
@@ -197,7 +204,7 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                 }
 
                 if ($deposit['end_date'] > date('Y-m-d')) {
-                    throw new Exception('لا يمكن إنهاء الوديعة قبل حلول تاريخ انتنائها المستحق (' . formatDate($deposit['end_date']) . ').');
+                    throw new Exception('لا يمكن إنهاء الوديعة قبل حلول تاريخ انتهائها.');
                 }
 
                 if ((int)$deposit['principal_refunded'] === 1) {
@@ -206,7 +213,7 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
 
                 $accumulated = (float)$deposit['accumulated_profit'];
                 if ($accumulated > 0) {
-                    throw new Exception('لا يمكن إنهاء الوديعة قبل صرف كامل الأرباح المتراكمة المتبقية (' . formatMoney($accumulated, $deposit['currency']) . ').');
+                    throw new Exception('لا يمكن إنهاء الوديعة قبل صرف كامل الأرباح المتراكمة المتبقية.');
                 }
 
                 $receiptNo = generateReceiptNo($pdo);
@@ -222,16 +229,19 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new Exception('فشل إنهاء الوديعة لعدم تطابق الحالة.');
                 }
 
-                // Record principal_refund transaction
                 $insTx = $pdo->prepare("
-                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
-                    VALUES (?, ?, ?, 'principal_refund', ?, ?, NOW(), ?)
+                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, direction, amount, currency, approval_request_id, date, note)
+                    VALUES (?, ?, ?, 'principal_refund', 'debit', ?, ?, ?, NOW(), ?)
                 ");
-                $insTx->execute([$receiptNo, $deposit['investor_id'], $depositId, $deposit['amount'], $deposit['currency'], 'إرجاع رأس المال للوديعة المنتهية']);
+                $insTx->execute([$receiptNo, $deposit['investor_id'], $depositId, $deposit['amount'], $deposit['currency'], $requestId, 'إرجاع رأس المال للوديعة المنتهية']);
                 $txId = (int)$pdo->lastInsertId();
                 $execRef = 'REFUND-TX-' . $txId . ' / ' . $receiptNo;
                 break;
 
+            // ═══════════════════════════════════════════
+            // withdrawals.approve — Investor Withdrawal
+            // SECTION 1 FIX: approval_request_id conflict
+            // ═══════════════════════════════════════════
             case 'withdrawals.approve':
                 $wReqId = (int)($payload['withdraw_request_id'] ?? 0);
 
@@ -243,13 +253,27 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new Exception('طلب السحب غير متاح للموافقة أو تم البت فيه سابقاً.');
                 }
 
-                if ($wReq['transaction_id'] !== null || $wReq['approval_request_id'] !== null) {
-                    throw new Exception('طلب السحب هذا مرتبطة بمعاملة سابقة ولا يمكن إعادة اعتماده.');
+                // FIX: transaction_id must be NULL (not yet executed)
+                if ($wReq['transaction_id'] !== null) {
+                    throw new Exception('تم تنفيذ طلب السحب سابقاً ولا يمكن إعادة التنفيذ.');
                 }
 
-                $depositId = (int)$wReq['deposit_id'];
-                $amount = (float)$wReq['amount'];
+                // FIX: approval_request_id must match current requestId
+                if (empty($wReq['approval_request_id']) || (int)$wReq['approval_request_id'] !== $requestId) {
+                    throw new Exception('طلب السحب غير مرتبط بطلب الموافقة الحالي.');
+                }
 
+                // Validate entity_id matches
+                if ((int)$req['entity_id'] !== $wReqId) {
+                    throw new Exception('عدم تطابق بين طلب الموافقة وطلب السحب.');
+                }
+
+                $depositId = (int)($wReq['deposit_id'] ?? 0);
+                if ($depositId <= 0) {
+                    throw new Exception('طلب السحب غير مرتبط بوديعة. يرجى ربطه بوديعة قبل الاعتماد.');
+                }
+
+                $amount = (float)$wReq['amount'];
                 if ($amount <= 0) {
                     throw new Exception('مبلغ طلب السحب يجب أن يكون أكبر من صفر.');
                 }
@@ -262,13 +286,19 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new Exception('الوديعة المرتبطة بالسحب غير موجودة أو غير متاحة.');
                 }
 
-                // Verify investor ownership matches
                 if ((int)$wReq['investor_id'] !== (int)$deposit['investor_id']) {
                     throw new Exception('المستثمر في طلب السحب لا يطابق المستثمر مالك الوديعة.');
                 }
 
                 if ((float)$deposit['accumulated_profit'] < $amount) {
                     throw new Exception('الرصيد المتاح حالياً بالوديعة غير كافٍ لتنفيذ طلب السحب.');
+                }
+
+                // Verify no previous transaction linked to this withdraw_request
+                $chkDupTx = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE approval_request_id = ? AND deposit_id = ? AND type = 'withdrawal_payout'");
+                $chkDupTx->execute([$requestId, $depositId]);
+                if ((int)$chkDupTx->fetchColumn() > 0) {
+                    throw new Exception('يوجد قيد مالي مسجل سابقاً لطلب الموافقة هذا.');
                 }
 
                 $currency = $deposit['currency'];
@@ -285,19 +315,21 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new Exception('فشل الخصم المالي بسبب تعارض تزامن.');
                 }
 
+                // NEW: Use withdrawal_payout type
                 $insTx = $pdo->prepare("
-                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
-                    VALUES (?, ?, ?, 'withdraw', ?, ?, NOW(), ?)
+                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, direction, amount, currency, approval_request_id, date, note)
+                    VALUES (?, ?, ?, 'withdrawal_payout', 'debit', ?, ?, ?, NOW(), ?)
                 ");
-                $insTx->execute([$receiptNo, $deposit['investor_id'], $depositId, $amount, $currency, 'صرف طلب سحب المستثمر رقم #' . $wReqId]);
+                $insTx->execute([$receiptNo, $deposit['investor_id'], $depositId, $amount, $currency, $requestId, 'صرف طلب سحب المستثمر رقم #' . $wReqId]);
                 $txId = (int)$pdo->lastInsertId();
 
+                // Update withdraw_request to paid - DO NOT overwrite approval_request_id
                 $upW = $pdo->prepare("
                     UPDATE withdraw_requests 
-                    SET status = 'paid', staff_user_id = ?, decision_date = NOW(), transaction_id = ?, approval_request_id = ? 
+                    SET status = 'paid', staff_user_id = ?, decision_date = NOW(), transaction_id = ?
                     WHERE id = ? AND status = 'pending'
                 ");
-                $upW->execute([$approverId, $txId, $requestId, $wReqId]);
+                $upW->execute([$approverId, $txId, $wReqId]);
 
                 if ($upW->rowCount() !== 1) {
                     throw new Exception('فشل تحديث حالة طلب السحب إلى مدفوع.');
@@ -306,6 +338,10 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                 $execRef = 'WITHDRAW-REQ-' . $wReqId . ' / TX-' . $txId;
                 break;
 
+            // ═══════════════════════════════════════════
+            // profits.manual — Manual Profit Adjustment
+            // SECTION 4 FIX: Use manual_profit_adjustments
+            // ═══════════════════════════════════════════
             case 'profits.manual':
                 $depositId = (int)($payload['deposit_id'] ?? 0);
                 $amount = (float)($payload['amount'] ?? 0);
@@ -332,17 +368,24 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new Exception('الوديعة غير موجودة أو غير متاحة لربح يدوي.');
                 }
 
-                // If tied to a month, prevent duplicate profit cycle
-                $cycleDate = date('Y-m-t', strtotime($month . '-01'));
-                $chkCycle = $pdo->prepare("SELECT COUNT(*) FROM profit_cycles WHERE deposit_id = ? AND cycle_date = ?");
-                $chkCycle->execute([$depositId, $cycleDate]);
-                if ((int)$chkCycle->fetchColumn() > 0) {
-                    throw new Exception("تم احتساب أو إضافة ربح لهذه الوديعة لشهر $month مسبقاً.");
+                // FIX: Prevent duplicate execution via UNIQUE approval_request_id in manual_profit_adjustments
+                $chkMpa = $pdo->prepare("SELECT COUNT(*) FROM manual_profit_adjustments WHERE approval_request_id = ?");
+                $chkMpa->execute([$requestId]);
+                if ((int)$chkMpa->fetchColumn() > 0) {
+                    throw new Exception('تم تنفيذ هذا التعديل اليدوي سابقاً من طلب الموافقة نفسه.');
                 }
 
-                $receiptNo = generateReceiptNo($pdo);
                 $currency = $deposit['currency'];
+                $receiptNo = generateReceiptNo($pdo);
 
+                // Insert manual_profit_adjustments record
+                $insMpa = $pdo->prepare("
+                    INSERT INTO manual_profit_adjustments (deposit_id, amount, currency, month, reason, approval_request_id, requested_by, approved_by, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                ");
+                $insMpa->execute([$depositId, $amount, $currency, $month, $reason, $requestId, $req['requested_by'], $approverId]);
+
+                // Update deposit accumulated_profit
                 $upDep = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ? WHERE id = ?");
                 $upDep->execute([$amount, $depositId]);
 
@@ -350,14 +393,19 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new Exception('فشل تحديث رصيد الوديعة.');
                 }
 
+                // NEW: Use profit_accrual type
                 $insTx = $pdo->prepare("
-                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
-                    VALUES (?, ?, ?, 'profit', ?, ?, NOW(), ?)
+                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, direction, amount, currency, approval_request_id, date, note)
+                    VALUES (?, ?, ?, 'profit_accrual', 'credit', ?, ?, ?, NOW(), ?)
                 ");
-                $insTx->execute([$receiptNo, $deposit['investor_id'], $depositId, $amount, $currency, '[تعديل يدوي - ' . $month . '] ' . $reason]);
+                $insTx->execute([$receiptNo, $deposit['investor_id'], $depositId, $amount, $currency, $requestId, '[تعديل يدوي - ' . $month . '] ' . $reason]);
                 $execRef = 'MANUAL-PROFIT-' . $pdo->lastInsertId();
                 break;
 
+            // ═══════════════════════════════════════════
+            // deposits.financial_change — Deposit Edit
+            // SECTION 5 & 6 FIX: direction + financial history guard
+            // ═══════════════════════════════════════════
             case 'deposits.financial_change':
                 $depositId = (int)($payload['deposit_id'] ?? 0);
 
@@ -391,7 +439,6 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new Exception('نوع الوديعة الجديد غير صالح.');
                 }
 
-                // Calculate end_date based on max_days
                 $startDt = DateTimeImmutable::createFromFormat('Y-m-d', $newStartDate);
                 if (!$startDt) {
                     throw new Exception('تاريخ البداية الجديد غير صالح.');
@@ -406,33 +453,71 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new Exception('العملة الجديدة غير صالحة.');
                 }
 
-                // Check if deposit has existing transactions
-                $txCountStmt = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE deposit_id = ?");
-                $txCountStmt->execute([$depositId]);
-                $txCount = (int)$txCountStmt->fetchColumn();
-
-                if ($txCount > 0) {
-                    if ($newCurrency !== $deposit['currency']) {
-                        throw new Exception('لا يمكن تغيير عملة وديعة مرتبطة بمعاملات مالية مسجلة لتجنب التضارب المحاسبي.');
-                    }
-                    if ($newInvestorId !== (int)$deposit['investor_id']) {
-                        throw new Exception('لا يمكن نقل ملكية الوديعة لمستثمر آخر بعد تسجيل معاملات مالية عليها إلا عبر قيد تسوية خاص.');
+                // SECTION 6 FIX: Check ALL financial history tables, not just transactions
+                $hasFinHistory = false;
+                $historyTables = [
+                    "SELECT COUNT(*) FROM transactions WHERE deposit_id = ?",
+                    "SELECT COUNT(*) FROM profit_cycles WHERE deposit_id = ?",
+                    "SELECT COUNT(*) FROM withdraw_requests WHERE deposit_id = ?",
+                    "SELECT COUNT(*) FROM manual_profit_adjustments WHERE deposit_id = ?",
+                    "SELECT COUNT(*) FROM deposit_adjustments WHERE deposit_id = ?",
+                ];
+                foreach ($historyTables as $sql) {
+                    $hStmt = $pdo->prepare($sql);
+                    $hStmt->execute([$depositId]);
+                    if ((int)$hStmt->fetchColumn() > 0) {
+                        $hasFinHistory = true;
+                        break;
                     }
                 }
 
-                // Check if amount changed -> create deposit_adjustments record
+                if ($hasFinHistory) {
+                    // Immutable fields after financial history exists
+                    if ($newCurrency !== $deposit['currency']) {
+                        throw new Exception('لا يمكن تغيير عملة وديعة مرتبطة بحركات مالية مسجلة.');
+                    }
+                    if ($newInvestorId !== (int)$deposit['investor_id']) {
+                        throw new Exception('لا يمكن نقل ملكية الوديعة لمستثمر آخر بعد تسجيل حركات مالية عليها.');
+                    }
+                    if ($newStartDate !== $deposit['start_date']) {
+                        throw new Exception('لا يمكن تغيير تاريخ بداية الوديعة بعد تسجيل حركات مالية.');
+                    }
+                    if ($newDepositTypeId !== (int)$deposit['deposit_type_id']) {
+                        throw new Exception('لا يمكن تغيير نوع الوديعة بعد تسجيل حركات مالية.');
+                    }
+
+                    // Check profit_cycles and pending withdrawals for end_date/frequency changes
+                    $hasCycles = $pdo->prepare("SELECT COUNT(*) FROM profit_cycles WHERE deposit_id = ?");
+                    $hasCycles->execute([$depositId]);
+                    $hasPendingWr = $pdo->prepare("SELECT COUNT(*) FROM withdraw_requests WHERE deposit_id = ? AND status = 'pending'");
+                    $hasPendingWr->execute([$depositId]);
+
+                    if ((int)$hasCycles->fetchColumn() > 0 || (int)$hasPendingWr->fetchColumn() > 0) {
+                        if ($newEndDate !== $deposit['end_date']) {
+                            throw new Exception('لا يمكن تغيير تاريخ انتهاء الوديعة بعد وجود دورات أرباح أو طلبات سحب معلقة.');
+                        }
+                        if ($newPayoutFreq !== (int)$deposit['profit_payout_frequency']) {
+                            throw new Exception('لا يمكن تغيير دورية صرف الأرباح بعد وجود دورات أرباح أو طلبات سحب معلقة.');
+                        }
+                    }
+                }
+
+                // Handle amount change -> deposit_adjustments with direction
                 $oldAmount = (float)$deposit['amount'];
                 if ($newAmount !== $oldAmount) {
                     $diff = $newAmount - $oldAmount;
+                    $direction = $diff > 0 ? 'increase' : 'decrease';
+
                     $insAdj = $pdo->prepare("
-                        INSERT INTO deposit_adjustments (deposit_id, old_amount, new_amount, difference, currency, approval_request_id, requested_by, approved_by, reason, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                        INSERT INTO deposit_adjustments (deposit_id, old_amount, new_amount, difference, direction, currency, approval_request_id, requested_by, approved_by, reason, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                     ");
                     $insAdj->execute([
                         $depositId,
                         $oldAmount,
                         $newAmount,
                         $diff,
+                        $direction,
                         $deposit['currency'],
                         $requestId,
                         $req['requested_by'],
@@ -440,19 +525,22 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                         'تعديل قيمة الوديعة بناءً على طلب موافقة #' . $requestId
                     ]);
 
-                    // Record adjustment transaction
+                    // Record adjustment transaction with direction
                     $receiptNo = generateReceiptNo($pdo);
+                    $txDirection = $diff > 0 ? 'credit' : 'debit';
                     $insTx = $pdo->prepare("
-                        INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
-                        VALUES (?, ?, ?, 'deposit_adjustment', ?, ?, NOW(), ?)
+                        INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, direction, amount, currency, approval_request_id, date, note)
+                        VALUES (?, ?, ?, 'deposit_adjustment', ?, ?, ?, ?, NOW(), ?)
                     ");
                     $insTx->execute([
                         $receiptNo,
                         $deposit['investor_id'],
                         $depositId,
+                        $txDirection,
                         abs($diff),
                         $deposit['currency'],
-                        'تسوية تعديل رأس المال للوديعة (من ' . formatMoney($oldAmount, $deposit['currency']) . ' إلى ' . formatMoney($newAmount, $deposit['currency']) . ')'
+                        $requestId,
+                        ($direction === 'increase' ? 'زيادة' : 'تخفيض') . ' رأس المال (من ' . formatMoney($oldAmount, $deposit['currency']) . ' إلى ' . formatMoney($newAmount, $deposit['currency']) . ')'
                     ]);
                 }
 
@@ -473,13 +561,13 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     $depositId
                 ]);
 
-                if ($upDep->rowCount() < 1) {
-                    // It's possible values were unchanged
-                }
-
                 $execRef = 'FIN-CHANGE-' . $depositId;
                 break;
 
+            // ═══════════════════════════════════════════
+            // rates.declaration — Monthly Rate Declaration
+            // SECTION 3 FIX: Record profit_accrual transactions
+            // ═══════════════════════════════════════════
             case 'rates.declaration':
                 $month = trim($payload['month'] ?? '');
                 $depositTypeId = (int)($payload['deposit_type_id'] ?? 0);
@@ -497,7 +585,7 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                 $dType = $typeStmt->fetch();
 
                 if (!$dType) {
-                    throw new Exception('نوع الوديعة غير صالحة.');
+                    throw new Exception('نوع الوديعة غير صالح.');
                 }
 
                 $minRate = (float)$dType['min_rate'] * 100;
@@ -528,30 +616,25 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                 ");
                 $insMr->execute([$month, $depositTypeId, ($rate / 100)]);
 
-                // STRICT MATURITY CALCULATION (Section 1)
+                // Calculate profit for eligible deposits
                 $depStmt = $pdo->prepare("SELECT d.* FROM deposits d WHERE d.deposit_type_id = ? AND d.status = 'active'");
                 $depStmt->execute([$depositTypeId]);
                 $activeDeps = $depStmt->fetchAll();
 
                 $calcCount = 0;
                 foreach ($activeDeps as $dep) {
-                    // Check start_date
                     if (empty($dep['start_date'])) continue;
 
-                    // Calculate true maturity date using system helper
                     $nextProfitDt = calcNextProfitDate($dep);
                     if (!$nextProfitDt) continue;
 
                     $nextMonthStr = $nextProfitDt->format('Y-m');
                     $actualCycleDate = $nextProfitDt->format('Y-m-d');
 
-                    // Check if maturity date matches declared month
                     if ($nextMonthStr !== $month) continue;
-
-                    // Check date boundaries
                     if ($actualCycleDate < $dep['start_date'] || $actualCycleDate > $dep['end_date']) continue;
 
-                    // Idempotency check on profit_cycles(deposit_id, cycle_date)
+                    // Idempotency: skip if cycle already exists
                     $checkCycle = $pdo->prepare("SELECT COUNT(*) FROM profit_cycles WHERE deposit_id = ? AND cycle_date = ?");
                     $checkCycle->execute([$dep['id'], $actualCycleDate]);
                     if ((int)$checkCycle->fetchColumn() > 0) continue;
@@ -559,15 +642,36 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     $monthlyProfit = round((float)$dep['amount'] * ($rate / 100), 2);
                     if ($monthlyProfit <= 0) continue;
 
+                    // 1. Create profit_cycle
                     $insCycle = $pdo->prepare("
                         INSERT INTO profit_cycles (deposit_id, cycle_date, profit_amount, status, created_at)
                         VALUES (?, ?, ?, 'calculated', NOW())
                     ");
                     $insCycle->execute([$dep['id'], $actualCycleDate, $monthlyProfit]);
 
-                    // Update deposit accumulated_profit and set last_profit_date to actual maturity date
-                    $upDep = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ?, last_profit_date = ? WHERE id = ?");
-                    $upDep->execute([$monthlyProfit, $actualCycleDate, $dep['id']]);
+                    // 2. Update accumulated_profit
+                    $upDepAccum = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ?, last_profit_date = ? WHERE id = ?");
+                    $upDepAccum->execute([$monthlyProfit, $actualCycleDate, $dep['id']]);
+
+                    if ($upDepAccum->rowCount() !== 1) {
+                        throw new Exception('فشل تحديث رصيد الوديعة رقم #' . $dep['id']);
+                    }
+
+                    // 3. NEW: Create profit_accrual transaction
+                    $accrualReceiptNo = generateReceiptNo($pdo);
+                    $insAccrualTx = $pdo->prepare("
+                        INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, direction, amount, currency, approval_request_id, date, note)
+                        VALUES (?, ?, ?, 'profit_accrual', 'credit', ?, ?, ?, NOW(), ?)
+                    ");
+                    $insAccrualTx->execute([
+                        $accrualReceiptNo,
+                        $dep['investor_id'],
+                        $dep['id'],
+                        $monthlyProfit,
+                        $dep['currency'],
+                        $requestId,
+                        'استحقاق أرباح شهر ' . $month . ' بنسبة ' . $rate . '%'
+                    ]);
 
                     $calcCount++;
                 }
@@ -579,7 +683,7 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                 throw new Exception('نوع العملية غير معروف: ' . htmlspecialchars($opType));
         }
 
-        // Update approval request status to executed AND VERIFY ROW COUNT === 1 (Section 7)
+        // Update approval request status to executed
         $upReq = $pdo->prepare("
             UPDATE approval_requests 
             SET status = 'executed', approved_by = ?, approved_at = NOW(), executed_at = NOW(), execution_reference = ?
@@ -606,7 +710,6 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
             $pdo->rollBack();
         }
 
-        // Section 8: Technical Error Handling & Error References
         $errRef = 'ERR-' . strtoupper(substr(bin2hex(random_bytes(4)), 0, 8));
         error_log("[$errRef] Approval Execution Failed: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
 
@@ -633,7 +736,6 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
 
 /**
  * Reject an approval request with mandatory reason.
- * Executed inside DB Transaction with FOR UPDATE lock and permission validation.
  */
 function rejectApprovalRequest(PDO $pdo, int $requestId, int $rejecterId, string $reason): bool
 {

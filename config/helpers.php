@@ -194,11 +194,27 @@ function arabicTxType(string $type): string
 {
     return match ($type) {
         'deposit' => 'إيداع جديد',
-        'profit' => 'أرباح مصروفة',
-        'withdraw' => 'سحب أرباح',
+        'profit_accrual' => 'استحقاق أرباح',
+        'profit_payout' => 'صرف أرباح',
+        'withdrawal_payout' => 'صرف طلب سحب',
         'principal_refund' => 'إرجاع رأس المال',
         'deposit_adjustment' => 'تسوية رأس المال',
+        // Legacy types (historical compatibility)
+        'profit' => 'أرباح (قديم)',
+        'withdraw' => 'سحب (قديم)',
         default => $type,
+    };
+}
+
+/** Arabic transaction direction label */
+function arabicDirection(string $dir): string
+{
+    return match ($dir) {
+        'credit' => 'إضافة',
+        'debit' => 'خصم',
+        'increase' => 'زيادة',
+        'decrease' => 'تخفيض',
+        default => '—',
     };
 }
 

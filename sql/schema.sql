@@ -201,18 +201,22 @@ CREATE TABLE IF NOT EXISTS `deposit_adjustments` (
 
 -- 10. transactions (Immutable Financial Ledger)
 CREATE TABLE IF NOT EXISTS `transactions` (
-  `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `receipt_no`  VARCHAR(30) NOT NULL,
-  `investor_id` INT UNSIGNED NOT NULL,
-  `deposit_id`  INT UNSIGNED NULL,
-  `type`        ENUM('deposit','profit','withdraw','profit_accrual','profit_payout','withdrawal_payout','principal_refund','deposit_adjustment') NOT NULL,
-  `amount`      DECIMAL(12,2) NOT NULL,
-  `currency`    ENUM('IQD','USD') NOT NULL DEFAULT 'IQD',
-  `date`        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `note`        VARCHAR(255) NULL,
-  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `id`                  INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `receipt_no`          VARCHAR(30) NOT NULL,
+  `investor_id`         INT UNSIGNED NOT NULL,
+  `deposit_id`          INT UNSIGNED NULL,
+  `type`                ENUM('deposit','profit','withdraw','profit_accrual','profit_payout','withdrawal_payout','principal_refund','deposit_adjustment') NOT NULL,
+  `direction`           ENUM('credit','debit','neutral') NOT NULL DEFAULT 'neutral',
+  `amount`              DECIMAL(12,2) NOT NULL,
+  `currency`            ENUM('IQD','USD') NOT NULL DEFAULT 'IQD',
+  `approval_request_id` INT UNSIGNED NULL,
+  `date`                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `note`                VARCHAR(255) NULL,
+  `created_at`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_receipt_no` (`receipt_no`),
+  UNIQUE KEY `idx_tx_app_dep_type` (`approval_request_id`, `deposit_id`, `type`),
+  KEY `idx_tx_approval_req` (`approval_request_id`),
   CONSTRAINT `fk_tx_investor` FOREIGN KEY (`investor_id`) REFERENCES `investors` (`id`),
   CONSTRAINT `fk_tx_deposit`  FOREIGN KEY (`deposit_id`)  REFERENCES `deposits`  (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

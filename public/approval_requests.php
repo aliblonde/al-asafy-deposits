@@ -20,9 +20,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'approve' && $requestId > 0) {
         $res = executeApprovalRequest($pdo, $requestId, currentUserId());
         if ($res['success']) {
-            setFlash('success', 'تمت الموافقة والتنفيذ بنجاح: ' . $res['reference']);
+            setFlash('success', 'تمت الموافقة والتنفيذ بنجاح: ' . ($res['reference'] ?? ''));
         } else {
-            setFlash('danger', 'فشل التنفيذ: ' . getSafeErrorMessage(new Exception($res['message'])));
+            setFlash('danger', $res['safe_message'] ?? 'تعذر تنفيذ العملية. يرجى مراجعة مسؤول النظام.');
         }
     } elseif ($action === 'reject' && $requestId > 0) {
         $reason = trim($_POST['rejection_reason'] ?? '');
