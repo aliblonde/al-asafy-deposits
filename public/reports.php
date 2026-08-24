@@ -3,8 +3,9 @@
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/helpers.php';
+require_once __DIR__ . '/../config/rbac.php';
 
-requireRole(['admin', 'staff']);
+requirePermission('reports.view');
 $pdo = getPDO();
 
 $report = $_GET['report'] ?? 'deposits';
@@ -66,7 +67,7 @@ if ($receiptNo) {
             break;
 
         case 'profits':
-            $where = ["t.type='profit'"];
+            $where = ["t.type IN ('profit','profit_accrual','profit_payout')"];
             $params = [];
             if ($fDateFrom) {
                 $where[] = 't.date>=?';
@@ -226,9 +227,9 @@ include __DIR__ . '/../includes/header.php';
                                     <label class="form-label">نوع المعاملة</label>
                                     <select name="tx_type" class="form-select form-select-sm">
                                         <option value="">الكل</option>
-                                        <?php foreach (['deposit' => 'إيداع', 'profit' => 'ربح', 'withdraw' => 'سحب'] as $v => $l): ?>
+                                        <?php foreach (['deposit','profit_accrual','profit_payout','withdrawal_payout','principal_refund','deposit_adjustment','profit','withdraw'] as $v): ?>
                                             <option value="<?= $v ?>" <?= $fTxType === $v ? 'selected' : '' ?>>
-                                                <?= $l ?>
+                                                <?= arabicTxType($v) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -331,8 +332,7 @@ include __DIR__ . '/../includes/header.php';
                                         <td><?= htmlspecialchars($r['full_name']) ?></td>
                                         <td>
                                             <?php
-                                            $types = ['deposit' => 'إيداع', 'profit' => 'ربح', 'withdraw' => 'سحب'];
-                                            echo $types[$r['type']] ?? $r['type'];
+                                            echo arabicTxType($r['type']);
                                             ?>
                                         </td>
                                         <td class="text-gold"><?= formatMoney($r['amount'], $r['currency'] ?? 'IQD') ?></td>

@@ -5,8 +5,9 @@ require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/logger.php';
+require_once __DIR__ . '/../config/rbac.php';
 
-requireRole(['admin', 'staff']);
+requirePermission('investors.view');
 $pdo = getPDO();
 
 $id = (int) ($_GET['id'] ?? 0);
@@ -22,6 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     if ($action === 'reset_password') {
+        // Section 4: Require explicit permission for password reset
+        if (!userCan('investor_accounts.reset_password')) {
+            http_response_code(403);
+            setFlash('danger', 'ليس لديك صلاحية إعادة تعيين كلمة مرور المستثمر.');
+            header('Location: investor_view.php?id=' . $id);
+            exit;
+        }
+
         $newPwd = $_POST['new_password'] ?? '';
         $confirmPwd = $_POST['confirm_password'] ?? '';
         
@@ -32,14 +41,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('danger', 'كلمتا المرور غير متطابقتين.');
         } else {
             try {
-                // Fetch user linked to investor
                 $stmt = $pdo->prepare("SELECT id, username FROM users WHERE investor_id = ?");
                 $stmt->execute([$id]);
                 $user = $stmt->fetch();
                 
                 if ($user) {
                     $hash = password_hash($newPwd, PASSWORD_DEFAULT);
-                    $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+                    // Section 4: Increment session_version to invalidate all active sessions
+                    $stmt = $pdo->prepare("UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?");
                     $stmt->execute([$hash, $user['id']]);
                     
                     logActivity($pdo, 'RESET_INVESTOR_PASSWORD', 'users', $user['id'], null, [

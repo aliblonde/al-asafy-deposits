@@ -199,6 +199,8 @@ function arabicTxType(string $type): string
         'withdrawal_payout' => 'صرف طلب سحب',
         'principal_refund' => 'إرجاع رأس المال',
         'deposit_adjustment' => 'تسوية رأس المال',
+        'deposit_currency_reversal' => 'عكس قيد لتصحيح العملة',
+        'deposit_currency_restatement' => 'إثبات قيد بالعملة الصحيحة',
         // Legacy types (historical compatibility)
         'profit' => 'أرباح (قديم)',
         'withdraw' => 'سحب (قديم)',

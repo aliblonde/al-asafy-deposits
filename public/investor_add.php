@@ -5,8 +5,9 @@ require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/logger.php';
+require_once __DIR__ . '/../config/rbac.php';
 
-requireRole(['admin', 'staff']);   // Admin and Staff
+requirePermission('investors.view');
 $pdo = getPDO();
 
 $editId = (int) ($_GET['edit'] ?? 0);
@@ -125,8 +126,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if ($createUser && (!$editId || !$linkedUser)) {
     if (!$username)
       $errors[] = 'اسم المستخدم مطلوب لإنشاء الحساب.';
-    if (strlen($password) < 6)
-      $errors[] = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.';
+    if (strlen($password) < 1)
+      $errors[] = 'كلمة المرور مطلوبة لإنشاء الحساب.';
+    else {
+      $pwErrors = validatePasswordPolicy($password);
+      if (!empty($pwErrors)) $errors = array_merge($errors, $pwErrors);
+    }
     if ($username) {
       $chk = $pdo->prepare("SELECT id FROM users WHERE username=?");
       $chk->execute([$username]);
@@ -150,14 +155,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           "UPDATE investors SET full_name=?, national_id=?, phone=?, city=?, address=?, notes=?, contract_path=?, id_card_path=? WHERE id=?"
         )->execute([$fullName, $nationalId, $phone, $city, $address, $notes, $contractPath, $idCardPath, $editId]);
 
-        // If password is provided for linked user
+        // If password is provided for linked user — requires reset_password permission
         if ($linkedUser && !empty($password)) {
-          if (strlen($password) < 6) {
-            throw new Exception('كلمة المرور للمستثمر يجب أن تكون 6 أحرف على الأقل.');
+          if (!userCan('investor_accounts.reset_password')) {
+            throw new Exception('ليس لديك صلاحية إعادة تعيين كلمة مرور المستثمر.');
+          }
+          $pwErrors = validatePasswordPolicy($password);
+          if (!empty($pwErrors)) {
+            throw new Exception(implode(' ', $pwErrors));
           }
           $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
-          $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?")->execute([$hash, $linkedUser['id']]);
-          logActivity($pdo, 'UPDATE_USER_PASSWORD', 'users', $linkedUser['id'], null, ['username' => $linkedUser['username']]);
+          $pdo->prepare("UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?")->execute([$hash, $linkedUser['id']]);
+          logActivity($pdo, 'RESET_INVESTOR_PASSWORD', 'users', $linkedUser['id'], null, ['username' => $linkedUser['username']]);
         }
 
         // If newly creating user for existing investor

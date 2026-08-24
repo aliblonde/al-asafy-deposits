@@ -183,9 +183,12 @@ $pageTitle = 'بوابة المستثمر';
                 <span class="text-gold opacity-75 ms-2">| <?= htmlspecialchars($investorName) ?></span>
             </div>
             <div class="d-flex align-items-center gap-3">
-                <a href="logout.php" class="btn btn-sm btn-outline-danger" title="تسجيل الخروج">
-                    <i class="bi bi-box-arrow-right me-1"></i> خروج
-                </a>
+                <form method="POST" action="logout.php" class="d-inline">
+                    <?= csrfField() ?>
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="تسجيل الخروج">
+                        <i class="bi bi-box-arrow-right me-1"></i> خروج
+                    </button>
+                </form>
             </div>
         </div>
     </header>

@@ -137,8 +137,9 @@ CREATE TABLE IF NOT EXISTS `approval_requests` (
   `rejected_at`         DATETIME NULL,
   `executed_at`         DATETIME NULL,
   `created_at`          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `pending_idempotency_key` VARCHAR(64) GENERATED ALWAYS AS (CASE WHEN status = 'pending' THEN idempotency_key ELSE NULL END) STORED,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_app_idempotency_status` (`idempotency_key`, `status`),
+  UNIQUE KEY `idx_pending_idempotency` (`pending_idempotency_key`),
   CONSTRAINT `fk_app_requested_by` FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -260,13 +261,14 @@ CREATE TABLE IF NOT EXISTS `profit_cycles` (
 
 -- 13. archived_records & activity_logs
 CREATE TABLE IF NOT EXISTS `archived_records` (
-  `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `table_name`  VARCHAR(64) NOT NULL,
-  `record_id`   INT UNSIGNED NOT NULL,
-  `data_json`   JSON NOT NULL,
-  `deleted_by`  INT UNSIGNED NOT NULL,
-  `reason`      VARCHAR(255) NOT NULL,
-  `deleted_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `record_type`     VARCHAR(64) NOT NULL,
+  `original_id`     INT UNSIGNED NOT NULL,
+  `data_json`       JSON NOT NULL,
+  `deletion_reason` VARCHAR(255) NOT NULL,
+  `deleted_by`      INT UNSIGNED NOT NULL,
+  `ip_address`      VARCHAR(45) NULL,
+  `deleted_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -281,6 +283,22 @@ CREATE TABLE IF NOT EXISTS `activity_logs` (
   `ip_address` VARCHAR(45)  NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 14. schema_migrations
+CREATE TABLE IF NOT EXISTS `schema_migrations` (
+  `version`     INT UNSIGNED NOT NULL,
+  `applied_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `description` VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 15. audit_export_items
+CREATE TABLE IF NOT EXISTS `audit_export_items` (
+  `export_id`       INT UNSIGNED NOT NULL,
+  `activity_log_id` INT UNSIGNED NOT NULL,
+  PRIMARY KEY (`export_id`, `activity_log_id`),
+  KEY `idx_aei_log` (`activity_log_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

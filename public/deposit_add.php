@@ -160,8 +160,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $receiptNo = generateReceiptNo($pdo);
                 $pdo->prepare("
-                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, amount, currency, date, note)
-                    VALUES (?, ?, ?, 'deposit', ?, ?, NOW(), ?)
+                    INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, direction, amount, currency, date, note)
+                    VALUES (?, ?, ?, 'deposit', 'credit', ?, ?, NOW(), ?)
                 ")->execute([
                     $receiptNo,
                     $form['investor_id'],

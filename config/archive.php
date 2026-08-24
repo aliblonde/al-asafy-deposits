@@ -12,7 +12,7 @@ require_once __DIR__ . '/logger.php';
  */
 function archiveRecord(PDO $pdo, string $recordType, int $originalId, string $reason): int
 {
-    requirePermission('archive.view');
+    requirePermission('archive.manage');
 
     $tableMap = [
         'investor' => 'investors',
@@ -37,25 +37,32 @@ function archiveRecord(PDO $pdo, string $recordType, int $originalId, string $re
     $deletedBy = currentUserId();
     $ip = getClientIp();
 
-    $ins = $pdo->prepare("
-        INSERT INTO archived_records (record_type, original_id, data_json, deletion_reason, deleted_by, deleted_at, ip_address)
-        VALUES (?, ?, ?, ?, ?, NOW(), ?)
-    ");
-    $ins->execute([$recordType, $originalId, json_encode($data, JSON_UNESCAPED_UNICODE), trim($reason), $deletedBy, $ip]);
+    // Section 13: Archive + delete + audit in a single transaction
+    $pdo->beginTransaction();
+    try {
+        $ins = $pdo->prepare("
+            INSERT INTO archived_records (record_type, original_id, data_json, deletion_reason, deleted_by, deleted_at, ip_address)
+            VALUES (?, ?, ?, ?, ?, NOW(), ?)
+        ");
+        $ins->execute([$recordType, $originalId, json_encode($data, JSON_UNESCAPED_UNICODE), trim($reason), $deletedBy, $ip]);
 
-    $archiveId = (int)$pdo->lastInsertId();
+        $archiveId = (int)$pdo->lastInsertId();
 
-    // Delete from active table
-    $del = $pdo->prepare("DELETE FROM `$tableName` WHERE id = ?");
-    $del->execute([$originalId]);
+        $del = $pdo->prepare("DELETE FROM `$tableName` WHERE id = ?");
+        $del->execute([$originalId]);
 
-    logActivity($pdo, 'ARCHIVE_RECORD', 'archived_records', $archiveId, null, [
-        'type' => $recordType,
-        'original_id' => $originalId,
-        'reason' => $reason
-    ]);
+        logActivity($pdo, 'ARCHIVE_RECORD', 'archived_records', $archiveId, null, [
+            'type' => $recordType,
+            'original_id' => $originalId,
+            'reason' => $reason
+        ]);
 
-    return $archiveId;
+        $pdo->commit();
+        return $archiveId;
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
 }
 
 /**
