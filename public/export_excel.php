@@ -113,7 +113,7 @@ if ($receiptNo !== '') {
     if ($dateFrom) { $where[] = 'd.start_date>=?'; $params[] = $dateFrom; }
     if ($dateTo) { $where[] = 'd.start_date<=?'; $params[] = $dateTo; }
 
-    $stmt = $pdo->prepare("SELECT d.id AS '#', i.full_name AS المستثمر, dt.name_ar AS 'نوع الوديعة', d.amount AS المبلغ, d.start_date AS البداية, d.end_date AS النهاية, d.profit_rate_monthly AS 'النسبة الشهرية', d.status AS الحالة FROM deposits d JOIN investors i ON i.id=d.investor_id JOIN deposit_types dt ON dt.id=d.deposit_type_id WHERE " . implode(' AND ', $where) . " ORDER BY d.created_at DESC");
+    $stmt = $pdo->prepare("SELECT d.id AS '#', i.full_name AS المستثمر, dt.name_ar AS 'نوع الوديعة', d.amount AS المبلغ, d.start_date AS البداية, d.end_date AS النهاية, dt.min_rate AS 'النسبة الشهرية', d.status AS الحالة FROM deposits d JOIN investors i ON i.id=d.investor_id JOIN deposit_types dt ON dt.id=d.deposit_type_id WHERE " . implode(' AND ', $where) . " ORDER BY d.created_at DESC");
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     

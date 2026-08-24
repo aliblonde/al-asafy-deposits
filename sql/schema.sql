@@ -293,7 +293,18 @@ CREATE TABLE IF NOT EXISTS `schema_migrations` (
   PRIMARY KEY (`version`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 15. audit_export_items
+-- 15. audit_export_history & audit_export_items
+CREATE TABLE IF NOT EXISTS `audit_export_history` (
+  `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `exported_by`  INT UNSIGNED NOT NULL,
+  `export_time`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `period_start` DATETIME DEFAULT NULL,
+  `period_end`   DATETIME DEFAULT NULL,
+  `record_count` INT UNSIGNED NOT NULL,
+  `file_hash`    VARCHAR(64) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `audit_export_items` (
   `export_id`       INT UNSIGNED NOT NULL,
   `activity_log_id` INT UNSIGNED NOT NULL,

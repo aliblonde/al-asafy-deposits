@@ -300,7 +300,7 @@ include __DIR__ . '/../includes/header.php';
                                         <td><?= currencyBadge($r['currency'] ?? 'IQD') ?></td>
                                         <td><?= formatDate($r['start_date']) ?></td>
                                         <td><?= formatDate($r['end_date']) ?></td>
-                                        <td><?= number_format($r['profit_rate_monthly'] * 100, 3) ?>%</td>
+                                        <td><?= number_format(($r['min_rate'] ?? 0) * 100, 3) ?>%</td>
                                         <td><span class="badge <?= statusBadge($r['status']) ?>"><?= arabicStatus($r['status']) ?></span></td>
                                     </tr>
                                 <?php endforeach; ?>

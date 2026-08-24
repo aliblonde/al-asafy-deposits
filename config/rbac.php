@@ -20,13 +20,10 @@ function userCan(string $permissionName, ?int $userId = null): bool
     }
 
     $role = ($userId && $userId !== currentUserId()) ? getUserRoleFromDb($uid) : currentRole();
-    if ($role === 'admin') {
-        return true; // Admin possesses universal permissions
-    }
 
     try {
         $pdo = getPDO();
-        // 1. Check explicit user_permissions overrides
+        // 1. Check explicit user_permissions overrides (Explicit Deny/Allow overrides role)
         $stmt = $pdo->prepare("
             SELECT up.permission_type 
             FROM user_permissions up
@@ -41,6 +38,11 @@ function userCan(string $permissionName, ?int $userId = null): bool
             return false;
         }
         if ($override === 'allow') {
+            return true;
+        }
+
+        // 2. Admin role has universal permissions if not explicitly denied
+        if ($role === 'admin') {
             return true;
         }
 
