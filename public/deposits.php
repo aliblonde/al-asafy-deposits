@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_deposit_id']
 
     $stmt = $pdo->prepare("
         SELECT d.*, 
-               (SELECT COUNT(*) FROM transactions t WHERE t.deposit_id = d.id AND t.type = 'withdraw') as withdraw_count 
+               (SELECT COUNT(*) FROM transactions t WHERE t.deposit_id = d.id AND t.type IN ('withdraw','withdrawal_payout')) as withdraw_count 
         FROM deposits d 
         WHERE d.id = ? AND d.status IN ('active', 'completed')
     ");
@@ -98,7 +98,7 @@ $whereClause = implode(' AND ', $where);
 
 $deposits = $pdo->prepare(
     "SELECT d.*, i.full_name, dt.name_ar, dt.code,
-     (SELECT COUNT(*) FROM transactions t WHERE t.deposit_id = d.id AND t.type = 'withdraw') as withdraw_count
+     (SELECT COUNT(*) FROM transactions t WHERE t.deposit_id = d.id AND t.type IN ('withdraw','withdrawal_payout')) as withdraw_count
      FROM deposits d
      JOIN investors i   ON i.id = d.investor_id
      JOIN deposit_types dt ON dt.id = d.deposit_type_id

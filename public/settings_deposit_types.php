@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             continue;
 
         $pdo->prepare(
-            "UPDATE deposit_types SET profit_rate_monthly=?, min_days=?, max_days=? WHERE id=?"
+            "UPDATE deposit_types SET min_rate=?, min_days=?, max_days=? WHERE id=?"
         )->execute([$rate, $min, $max, $id]);
 
         logActivity(
@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'UPDATE_DEPOSIT_TYPE',
             'deposit_types',
             $id,
-            ['rate' => $oldRow['profit_rate_monthly'], 'min' => $oldRow['min_days'], 'max' => $oldRow['max_days']],
+            ['rate' => $oldRow['min_rate'], 'min' => $oldRow['min_days'], 'max' => $oldRow['max_days']],
             ['rate' => $rate, 'min' => $min, 'max' => $max]
         );
     }
@@ -113,12 +113,12 @@ include __DIR__ . '/../includes/header.php';
                                                 <td>
                                                     <input type="number" name="rate[]"
                                                         class="form-control form-control-sm rate-input" step="0.00001"
-                                                        min="0.001" max="1" value="<?= $t['profit_rate_monthly'] ?>"
+                                                        min="0.001" max="1" value="<?= $t['min_rate'] ?>"
                                                         style="width:130px" oninput="updatePct(this)">
                                                 </td>
                                                 <td>
                                                     <code class="pct-display" style="color:var(--gold-light)">
-                        <?= number_format($t['profit_rate_monthly'] * 100, 3) ?>%
+                        <?= number_format($t['min_rate'] * 100, 3) ?>%
                       </code>
                                                 </td>
                                                 <td>

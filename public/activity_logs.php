@@ -20,7 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $expFrom = $_POST['exp_from'] ?? '';
         $expTo = $_POST['exp_to'] ?? '';
 
-        $wExp = ['1=1']; $pExp = [];
+        // Capture max ID at the moment of export to guarantee determinism
+        $maxLogId = (int)$pdo->query("SELECT COALESCE(MAX(id), 0) FROM activity_logs")->fetchColumn();
+
+        $wExp = ['id <= ?']; $pExp = [$maxLogId];
         if ($expFrom) { $wExp[] = 'created_at >= ?'; $pExp[] = $expFrom . ' 00:00:00'; }
         if ($expTo) { $wExp[] = 'created_at <= ?'; $pExp[] = $expTo . ' 23:59:59'; }
 
@@ -32,23 +35,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fileHash = hash('sha256', $jsonContent);
         $recCount = count($expRows);
 
-        // Record in audit_export_history
-        $histStmt = $pdo->prepare("
-            INSERT INTO audit_export_history (exported_by, export_time, period_start, period_end, record_count, file_hash)
-            VALUES (?, NOW(), ?, ?, ?, ?)
-        ");
-        $histStmt->execute([
-            currentUserId(),
-            $expFrom ? $expFrom . ' 00:00:00' : null,
-            $expTo ? $expTo . ' 23:59:59' : null,
-            $recCount,
-            $fileHash
-        ]);
+        $pdo->beginTransaction();
+        try {
+            // Record in audit_export_history
+            $histStmt = $pdo->prepare("
+                INSERT INTO audit_export_history (exported_by, export_time, period_start, period_end, record_count, file_hash)
+                VALUES (?, NOW(), ?, ?, ?, ?)
+            ");
+            $histStmt->execute([
+                currentUserId(),
+                $expFrom ? $expFrom . ' 00:00:00' : null,
+                $expTo ? $expTo . ' 23:59:59' : null,
+                $recCount,
+                $fileHash
+            ]);
+            $exportId = (int)$pdo->lastInsertId();
 
-        logActivity($pdo, 'EXPORT_AUDIT_LOGS', 'activity_logs', null, null, [
-            'count' => $recCount,
-            'hash' => $fileHash
-        ]);
+            // Populate audit_export_items manifest
+            if (!empty($expRows)) {
+                $insItem = $pdo->prepare("INSERT IGNORE INTO audit_export_items (export_id, activity_log_id) VALUES (?, ?)");
+                foreach ($expRows as $row) {
+                    $insItem->execute([$exportId, $row['id']]);
+                }
+            }
+
+            logActivity($pdo, 'EXPORT_AUDIT_LOGS', 'activity_logs', $exportId, null, [
+                'count' => $recCount,
+                'hash' => $fileHash,
+                'max_id' => $maxLogId
+            ]);
+
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            setFlash('danger', 'فشل حفظ سجل التصدير: ' . $e->getMessage());
+            header('Location: activity_logs.php');
+            exit;
+        }
 
         $fileName = 'audit_export_' . date('Y-m-d_H-i-s') . '.json';
         header('Content-Type: application/json; charset=utf-8');
@@ -76,16 +99,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ((int)$chkExp->fetchColumn() === 0) {
                 setFlash('danger', 'لا يمكن حذف أي سجلات تدقيق قبل تصديرها بنجاح وتسجيل عملية التصدير أولاً.');
             } else {
-                $delStmt = $pdo->prepare("DELETE FROM activity_logs WHERE created_at >= ? AND created_at <= ?");
-                $delStmt->execute([$delFrom . ' 00:00:00', $delTo . ' 23:59:59']);
-                $deletedCount = $delStmt->rowCount();
+                $pdo->beginTransaction();
+                try {
+                    // Delete ONLY logs that exist in the manifest (audit_export_items)
+                    $delStmt = $pdo->prepare("
+                        DELETE al FROM activity_logs al
+                        JOIN audit_export_items aei ON aei.activity_log_id = al.id
+                        JOIN audit_export_history aeh ON aeh.id = aei.export_id
+                        WHERE (aeh.period_start IS NULL OR aeh.period_start <= ?) 
+                          AND (aeh.period_end IS NULL OR aeh.period_end >= ?)
+                          AND al.created_at >= ? AND al.created_at <= ?
+                    ");
+                    $delStmt->execute([$delFrom . ' 00:00:00', $delTo . ' 23:59:59', $delFrom . ' 00:00:00', $delTo . ' 23:59:59']);
+                    $deletedCount = $delStmt->rowCount();
 
-                logActivity($pdo, 'DELETE_EXPORTED_AUDIT_LOGS', 'activity_logs', null, null, [
-                    'deleted_count' => $deletedCount,
-                    'period' => "$delFrom to $delTo"
-                ]);
+                    logActivity($pdo, 'DELETE_EXPORTED_AUDIT_LOGS', 'activity_logs', null, null, [
+                        'deleted_count' => $deletedCount,
+                        'period' => "$delFrom to $delTo"
+                    ]);
 
-                setFlash('success', "تم حذف $deletedCount سجل تدقيق مصدّر سابقاً بنجاح.");
+                    $pdo->commit();
+                    setFlash('success', "تم حذف $deletedCount سجل تدقيق مصدّر سابقاً عبر بيان التصدير (Manifest) بنجاح.");
+                } catch (Throwable $e) {
+                    if ($pdo->inTransaction()) $pdo->rollBack();
+                    setFlash('danger', 'فشل حذف السجلات: ' . $e->getMessage());
+                }
             }
         }
         header('Location: activity_logs.php');

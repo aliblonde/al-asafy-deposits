@@ -11,24 +11,31 @@ require_once __DIR__ . '/../config/logger.php';
 requireLogin();
 
 $user = currentUser();
-
-// Guard: Only investor role (or admin/staff viewing test) allowed
-if ($user['role'] !== 'investor' && !isset($_GET['as_investor_id'])) {
-    header('Location: dashboard.php');
-    exit;
-}
-
 $pdo = getPDO();
 
 $investorId = $user['investor_id'] ?? 0;
 
-// Admin override for testing/viewing investor portal
-if (currentRole() === 'admin' && isset($_GET['as_investor_id'])) {
-    $investorId = (int)$_GET['as_investor_id'];
+// Admin/Staff impersonation override for viewing investor portal
+if (isset($_GET['as_investor_id'])) {
+    if (!userCan('investors.impersonate')) {
+        http_response_code(403);
+        die('<div style="font-family:sans-serif;color:#c00;padding:50px;text-align:center;direction:rtl">403 — غير مصرح لك بانتحال صفة المستثمر (تتطلب صلاحية investors.impersonate).</div>');
+    }
+    $targetInvId = (int)$_GET['as_investor_id'];
+    if ($targetInvId > 0) {
+        $investorId = $targetInvId;
+        logActivity($pdo, 'IMPERSONATE_INVESTOR_VIEW', 'investors', $investorId, null, [
+            'admin_user_id' => currentUserId(),
+            'target_investor_id' => $investorId
+        ]);
+    }
+} elseif ($user['role'] !== 'investor') {
+    header('Location: dashboard.php');
+    exit;
 }
 
 if (!$investorId) {
-    die('<div style="font-family:sans-serif;color:#c00;padding:50px;text-align:center">عذراً، هذا الحساب غير مرتبط ببيانات مستثمر. يرجى التواصل مع الدعم.</div>');
+    die('<div style="font-family:sans-serif;color:#c00;padding:50px;text-align:center;direction:rtl">عذراً، هذا الحساب غير مرتبط ببيانات مستثمر. يرجى التواصل مع الدعم.</div>');
 }
 
 // Fetch investor info
@@ -183,9 +190,12 @@ $pageTitle = 'بوابة المستثمر';
                 <span class="text-gold opacity-75 ms-2">| <?= htmlspecialchars($investorName) ?></span>
             </div>
             <div class="d-flex align-items-center gap-3">
-                <a href="logout.php" class="btn btn-sm btn-outline-danger" title="تسجيل الخروج">
-                    <i class="bi bi-box-arrow-right me-1"></i> خروج
-                </a>
+                <form method="POST" action="logout.php" class="d-inline">
+                    <?= csrfField() ?>
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="تسجيل الخروج">
+                        <i class="bi bi-box-arrow-right me-1"></i> خروج
+                    </button>
+                </form>
             </div>
         </div>
     </header>

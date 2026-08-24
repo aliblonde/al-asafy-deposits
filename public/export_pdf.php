@@ -4,6 +4,9 @@ require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
+require_once __DIR__ . '/../config/rbac.php';
+
+requirePermission('reports.export');
 
 requireLogin();
 $pdo = getPDO();
@@ -245,7 +248,7 @@ if (file_exists($logoPath)) {
                         <td dir="ltr" style="text-align:right;"><?= formatMoney($r['amount']) ?></td>
                         <td><?= formatDate($r['start_date']) ?></td>
                         <td><?= formatDate($r['end_date']) ?></td>
-                        <td dir="ltr" style="text-align:right;"><?= number_format($r['profit_rate_monthly'] * 100, 3) ?>%</td>
+                        <td dir="ltr" style="text-align:right;"><?= number_format(($r['min_rate'] ?? 0) * 100, 3) ?>%</td>
                         <td><span class="badge"><?= arabicStatus($r['status']) ?></span></td>
                     </tr>
                 <?php endforeach; ?>

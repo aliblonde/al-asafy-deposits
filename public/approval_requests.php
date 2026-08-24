@@ -18,20 +18,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $requestId = (int)($_POST['request_id'] ?? 0);
 
     if ($action === 'approve' && $requestId > 0) {
+        // Section 2: Pre-check permission BEFORE any state change
+        try {
+            preCheckApprovalPermission($pdo, $requestId, currentUserId());
+        } catch (AuthorizationException $e) {
+            http_response_code(403);
+            setFlash('danger', $e->getMessage());
+            header('Location: approval_requests.php');
+            exit;
+        } catch (BusinessRuleException $e) {
+            setFlash('danger', $e->getMessage());
+            header('Location: approval_requests.php');
+            exit;
+        }
+
         $res = executeApprovalRequest($pdo, $requestId, currentUserId());
         if ($res['success']) {
             setFlash('success', 'تمت الموافقة والتنفيذ بنجاح: ' . ($res['reference'] ?? ''));
         } else {
-            setFlash('danger', $res['safe_message'] ?? 'تعذر تنفيذ العملية. يرجى مراجعة مسؤول النظام.');
+            if (!empty($res['is_auth_error'])) {
+                http_response_code(403);
+            }
+            setFlash('danger', $res['safe_message'] ?? 'تعذر تنفيذ العملية.');
         }
     } elseif ($action === 'reject' && $requestId > 0) {
         $reason = trim($_POST['rejection_reason'] ?? '');
         try {
+            // Section 2: Pre-check permission for rejection too
+            preCheckApprovalPermission($pdo, $requestId, currentUserId());
             if (rejectApprovalRequest($pdo, $requestId, currentUserId(), $reason)) {
                 setFlash('info', 'تم رفض طلب الموافقة وتسجيل السبب بنجاح.');
             } else {
                 setFlash('danger', 'تعذر رفض الطلب.');
             }
+        } catch (AuthorizationException $e) {
+            http_response_code(403);
+            setFlash('danger', $e->getMessage());
         } catch (Throwable $e) {
             setFlash('danger', getSafeErrorMessage($e, 'حدث خطأ أثناء رفض الطلب.'));
         }
@@ -128,6 +150,7 @@ include __DIR__ . '/../includes/header.php';
                                                 <span class="text-muted small">تتطلب صلاحية <?= htmlspecialchars($requiredPerm) ?></span>
                                             <?php endif; ?>
 
+                                            <?php if ($canApproveThis): ?>
                                             <!-- Rejection Modal -->
                                             <div class="modal fade" id="rejModal<?= $r['id'] ?>" tabindex="-1">
                                                 <div class="modal-dialog">
@@ -152,6 +175,7 @@ include __DIR__ . '/../includes/header.php';
                                                     </div>
                                                 </div>
                                             </div>
+                                            <?php endif; /* canApproveThis modal */ ?>
                                         <?php else: ?>
                                             <span class="text-muted small"><?= $r['status'] === 'executed' ? 'اعتمد بواسطة ' . htmlspecialchars($r['approver_name'] ?: 'المسؤول') : 'مرفوض' ?></span>
                                         <?php endif; ?>

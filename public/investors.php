@@ -3,8 +3,9 @@
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/helpers.php';
+require_once __DIR__ . '/../config/rbac.php';
 
-requireRole(['admin', 'staff']);
+requirePermission('investors.view');
 $pdo = getPDO();
 
 $search = trim($_GET['search'] ?? '');
