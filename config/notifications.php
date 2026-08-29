@@ -3,10 +3,7 @@
 
 require_once __DIR__ . "/db.php";
 
-/**
- * Send an in-app notification to a specific user
- */
-function sendNotification(PDO , int $userId, string $title, string $message, ?string $link = null): bool {
+function sendNotification(PDO $pdo, int $userId, string $title, string $message, ?string $link = null): bool {
     try {
         $stmt = $pdo->prepare("INSERT INTO notifications (user_id, title, message, link, created_at) VALUES (?, ?, ?, ?, NOW())");
         return $stmt->execute([$userId, $title, $message, $link]);
@@ -16,9 +13,6 @@ function sendNotification(PDO , int $userId, string $title, string $message, ?st
     }
 }
 
-/**
- * Get unread notifications count
- */
 function getUnreadNotificationsCount(PDO $pdo, int $userId): int {
     try {
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0");
@@ -29,9 +23,6 @@ function getUnreadNotificationsCount(PDO $pdo, int $userId): int {
     }
 }
 
-/**
- * Get latest notifications
- */
 function getLatestNotifications(PDO $pdo, int $userId, int $limit = 5): array {
     try {
         $stmt = $pdo->prepare("SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT " . (int)$limit);
@@ -42,9 +33,6 @@ function getLatestNotifications(PDO $pdo, int $userId, int $limit = 5): array {
     }
 }
 
-/**
- * Mark notification as read
- */
 function markNotificationRead(PDO $pdo, int $notifId, int $userId): bool {
     try {
         $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?");
@@ -54,9 +42,6 @@ function markNotificationRead(PDO $pdo, int $notifId, int $userId): bool {
     }
 }
 
-/**
- * Mark all notifications as read
- */
 function markAllNotificationsRead(PDO $pdo, int $userId): bool {
     try {
         $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0");
@@ -66,15 +51,12 @@ function markAllNotificationsRead(PDO $pdo, int $userId): bool {
     }
 }
 
-/**
- * Send Telegram Alert to Admin Group
- */
 function sendTelegramAlert(string $message): bool {
     $token = getenv("TELEGRAM_BOT_TOKEN") ?: ($_ENV["TELEGRAM_BOT_TOKEN"] ?? "");
     $chatId = getenv("TELEGRAM_ADMIN_CHAT_ID") ?: ($_ENV["TELEGRAM_ADMIN_CHAT_ID"] ?? "");
     
     if (empty($token) || empty($chatId)) {
-        return false; // Not configured, fail silently
+        return false; 
     }
     
     $url = "https://api.telegram.org/bot{$token}/sendMessage";
@@ -89,7 +71,7 @@ function sendTelegramAlert(string $message): bool {
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 5); // Don't block the app for too long
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
     
     $result = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -102,9 +84,6 @@ function sendTelegramAlert(string $message): bool {
     return true;
 }
 
-/**
- * Helper to notify investor by their investor_id
- */
 function notifyInvestor(PDO $pdo, int $investorId, string $title, string $message, ?string $link = null): bool {
     try {
         $stmt = $pdo->prepare("SELECT id FROM users WHERE investor_id = ? AND role = 'investor' LIMIT 1");
