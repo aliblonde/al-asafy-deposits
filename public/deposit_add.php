@@ -185,10 +185,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // --- Notifications ---
                 // Telegram
+                $invStmt = $pdo->prepare("SELECT full_name FROM investors WHERE id = ?");
+                $invStmt->execute([$form['investor_id']]);
+                $invName = $invStmt->fetchColumn() ?: 'غير معروف';
+
                 $username = currentUsername() ?: 'النظام';
-                $msg = "🔔 <b>تم إضافة وديعة جديدة (تم التفعيل مباشرة)</b>\n";
-                $msg .= "المبلغ: <code>" . number_format($amount, 2) . " {$form['currency']}</code>\n";
-                $msg .= "بواسطة: $username";
+                $msg = "🔔 <b>تم إضافة وديعة جديدة (مباشرة)</b>\n";
+                $msg .= "👤 المستثمر: <b>$invName</b>\n";
+                $msg .= "💰 المبلغ: <code>" . number_format($amount, 2) . " {$form['currency']}</code>\n";
+                $msg .= "📊 النوع: {$selType['name_ar']}\n";
+                $msg .= "📅 البداية: $startDateStr\n";
+                $msg .= "🧑‍💻 الموظف: $username";
                 sendTelegramAlert($msg);
 
                 // Investor In-App

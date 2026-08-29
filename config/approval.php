@@ -136,10 +136,24 @@ function createApprovalRequest(
 
         // Notify Admins via Telegram
         $username = currentUsername() ?: 'النظام';
-        $msg = "🔔 <b>طلب اعتماد جديد!</b>\n";
-        $msg .= "النوع: <code>$operationType</code>\n";
-        $msg .= "الكيان: <code>$entityType</code>\n";
-        $msg .= "بواسطة: $username";
+        $operationName = function_exists('arabicTxType') ? arabicTxType($operationType) : $operationType;
+        if ($operationName === $operationType) {
+            $operationName = match($operationType) {
+                'deposits.financial_change' => 'تعديل بيانات وديعة',
+                'deposits.close' => 'كسر / إغلاق وديعة',
+                'withdrawals.approve' => 'طلب سحب رصيد',
+                'profits.declare' => 'إعلان نسب الأرباح',
+                'profits.run' => 'التشغيل الآلي للأرباح',
+                'deposits.manual_profit' => 'إضافة ربح يدوي',
+                default => $operationType
+            };
+        }
+        
+        $msg = "🔔 <b>طلب اعتماد مالي جديد!</b>\n";
+        $msg .= "الطلب: <b>$operationName</b>\n";
+        $msg .= "رقم الكيان: <code>$entityId</code>\n";
+        $msg .= "بواسطة: $username\n\n";
+        $msg .= "يرجى الدخول للنظام لمراجعته.";
         sendTelegramAlert($msg);
 
         return $reqId;
