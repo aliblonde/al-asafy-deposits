@@ -1,19 +1,1 @@
--- Migration 007: Notifications System
-
-CREATE TABLE IF NOT EXISTS `notifications` (
-  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `user_id` INT UNSIGNED NOT NULL,
-  `title` VARCHAR(255) NOT NULL,
-  `message` TEXT NOT NULL,
-  `link` VARCHAR(255) DEFAULT NULL,
-  `is_read` TINYINT(1) NOT NULL DEFAULT 0,
-  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_notif_user_read` (`user_id`, `is_read`),
-  CONSTRAINT `fk_notif_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Insert the migration record
-INSERT IGNORE INTO schema_migrations (version, description, applied_at) 
-VALUES (7, '007_notifications_system', NOW());
-
+ⴭ䴠杩慲楴湯〠㜰›潎楴楦慣楴湯⁳祓瑳浥ਊ剃䅅䕔吠䉁䕌䤠⁆低⁔塅卉協怠潮楴楦慣楴湯恳⠠ 怠摩⁠义⁔乕䥓乇䑅丠呏丠䱕⁌啁佔䥟䍎䕒䕍呎ਬ†畠敳彲摩⁠义⁔乕䥓乇䑅丠呏丠䱕ⱌ 怠楴汴恥嘠剁䡃剁㈨㔵 低⁔啎䱌ਬ†浠獥慳敧⁠䕔员丠呏丠䱕ⱌ 怠楬歮⁠䅖䍒䅈⡒㔲⤵䐠䙅啁呌丠䱕ⱌ 怠獩牟慥恤吠义䥙呎ㄨ 低⁔啎䱌䐠䙅啁呌〠ਬ†捠敲瑡摥慟恴䐠呁呅䵉⁅低⁔啎䱌䐠䙅啁呌䌠剕䕒呎呟䵉卅䅔偍ਬ†剐䵉剁⁙䕋⁙怨摩⥠ਬ†䕋⁙楠硤湟瑯晩畟敳彲敲摡⁠怨獵牥楟恤‬楠彳敲摡⥠ਬ†佃华剔䥁呎怠武湟瑯晩畟敳恲䘠剏䥅乇䬠奅⠠畠敳彲摩⥠删䙅剅久䕃⁓畠敳獲⁠怨摩⥠传⁎䕄䕌䕔䌠十䅃䕄⤊䔠䝎义㵅湉潮䉄䐠䙅啁呌䌠䅈卒呅甽晴洸㑢䌠䱏䅌䕔甽晴洸㑢畟楮潣敤损㭩ਊⴭ䤠獮牥⁴桴⁥業牧瑡潩⁮敲潣摲䤊华剅⁔䝉低䕒䤠呎⁏捳敨慭浟杩慲楴湯⁳瘨牥楳湯‬敤捳楲瑰潩Ɱ愠灰楬摥慟⥴ਠ䅖啌卅⠠ⰷ✠〰強潮楴楦慣楴湯彳祳瑳浥Ⱗ丠坏⤨㬩ഊ
