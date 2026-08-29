@@ -137,7 +137,7 @@ $stmt = $pdo->prepare("
     LEFT JOIN deposits d ON d.id = wr.deposit_id
     LEFT JOIN users u ON u.id = wr.staff_user_id
     WHERE " . implode(' AND ', $where) . "
-    ORDER BY wr.created_at DESC
+    ORDER BY wr.request_date DESC
 ");
 $stmt->execute($params);
 $requests = $stmt->fetchAll();
