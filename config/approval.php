@@ -138,15 +138,15 @@ function createApprovalRequest(
         $username = currentUsername() ?: 'النظام';
         $operationName = function_exists('arabicTxType') ? arabicTxType($operationType) : $operationType;
         if ($operationName === $operationType) {
-            $operationName = match($operationType) {
+            $map = [
                 'deposits.financial_change' => 'تعديل بيانات وديعة',
                 'deposits.close' => 'كسر / إغلاق وديعة',
                 'withdrawals.approve' => 'طلب سحب رصيد',
                 'profits.declare' => 'إعلان نسب الأرباح',
                 'profits.run' => 'التشغيل الآلي للأرباح',
-                'deposits.manual_profit' => 'إضافة ربح يدوي',
-                default => $operationType
-            };
+                'deposits.manual_profit' => 'إضافة ربح يدوي'
+            ];
+            $operationName = $map[$operationType] ?? $operationType;
         }
         
         $msg = "🔔 <b>طلب اعتماد مالي جديد!</b>\n";
