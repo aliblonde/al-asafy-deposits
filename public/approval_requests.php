@@ -71,7 +71,7 @@ if ($statusFilter) {
 }
 
 $stmt = $pdo->prepare("
-    SELECT ar.*, u.full_name AS requester_name, u2.full_name AS approver_name
+    SELECT ar.*, u.username AS requester_name, u2.username AS approver_name
     FROM approval_requests ar
     LEFT JOIN users u ON u.id = ar.requested_by
     LEFT JOIN users u2 ON u2.id = ar.approved_by

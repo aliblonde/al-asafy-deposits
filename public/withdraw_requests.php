@@ -131,7 +131,7 @@ if ($statusFilter) {
 $stmt = $pdo->prepare("
     SELECT wr.*, i.full_name AS investor_name, 
            d.amount AS deposit_amount, d.currency AS deposit_currency,
-           u.full_name AS staff_name
+           u.username AS staff_name
     FROM withdraw_requests wr
     JOIN investors i ON i.id = wr.investor_id
     LEFT JOIN deposits d ON d.id = wr.deposit_id

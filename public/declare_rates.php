@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rates'])) {
 
 // Fetch historical declarations
 $history = $pdo->query("
-    SELECT rd.*, dt.name_ar, u.full_name AS creator_name
+    SELECT rd.*, dt.name_ar, u.username AS creator_name
     FROM rate_declarations rd
     JOIN deposit_types dt ON dt.id = rd.deposit_type_id
     LEFT JOIN users u ON u.id = rd.created_by
