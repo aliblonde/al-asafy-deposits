@@ -183,6 +183,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'receipt_no' => $receiptNo,
                 ]);
 
+                // --- Notifications ---
+                // Telegram
+                $username = currentUsername() ?: 'النظام';
+                $msg = "🔔 <b>تم إضافة وديعة جديدة (تم التفعيل مباشرة)</b>\n";
+                $msg .= "المبلغ: <code>" . number_format($amount, 2) . " {$form['currency']}</code>\n";
+                $msg .= "بواسطة: $username";
+                sendTelegramAlert($msg);
+
+                // Investor In-App
+                notifyInvestor($pdo, (int)$form['investor_id'], "وديعة جديدة 💰", "تم تفعيل وديعتك الجديدة بنجاح (الإيصال: $receiptNo).");
+                // ---------------------
+
                 setFlash('success', "تمت إضافة الوديعة بنجاح! رقم الإيصال: $receiptNo");
                 header('Location: deposits.php');
                 exit;
