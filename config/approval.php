@@ -6,6 +6,7 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/rbac.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/notifications.php';
 require_once __DIR__ . '/logger.php';
 
 // ═══════════════════════════════════════════
@@ -132,6 +133,14 @@ function createApprovalRequest(
             'entity' => $entityType,
             'entity_id' => $entityId
         ]);
+
+        // Notify Admins via Telegram
+        $username = currentUsername() ?: 'النظام';
+        $msg = "🔔 <b>طلب اعتماد جديد!</b>\n";
+        $msg .= "النوع: <code>$operationType</code>\n";
+        $msg .= "الكيان: <code>$entityType</code>\n";
+        $msg .= "بواسطة: $username";
+        sendTelegramAlert($msg);
 
         return $reqId;
     } catch (PDOException $e) {
@@ -637,6 +646,21 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
             'exec_ref' => $execRef
         ]);
 
+        // --- Notifications ---
+        sendNotification($pdo, $req['requested_by'], "تم الاعتماد ✅", "تمت الموافقة على طلب: " . arabicTxType($opType));
+        
+        // Notify Investor if applicable
+        if ($req['entity_type'] === 'deposits') {
+            if ($opType === 'create') {
+                notifyInvestor($pdo, (int)$payload['investor_id'], "وديعة جديدة 💰", "تم تفعيل وديعتك الجديدة بنجاح.");
+            } elseif ($opType === 'withdraw' || $opType === 'early_closure') {
+                notifyInvestor($pdo, (int)$payload['investor_id'], "سحب/كسر وديعة", "تمت الموافقة على طلب إغلاق/سحب الوديعة.");
+            } elseif ($opType === 'profit_payout') {
+                notifyInvestor($pdo, (int)$payload['investor_id'], "صرف أرباح 💵", "تم إيداع الأرباح في حسابك بنجاح.");
+            }
+        }
+        // ---------------------
+
         $pdo->commit();
 
         return ['success' => true, 'safe_message' => 'تمت الموافقة والتنفيذ بنجاح.', 'reference' => $execRef];
@@ -745,6 +769,10 @@ function rejectApprovalRequest(PDO $pdo, int $requestId, int $rejecterId, string
             'rejecter_id' => $rejecterId,
             'reason' => $reason
         ]);
+
+        // --- Notifications ---
+        sendNotification($pdo, $req['requested_by'], "تم الرفض ❌", "تم رفض طلب: " . arabicTxType($req['operation_type']) . " - السبب: $reason");
+        // ---------------------
 
         $pdo->commit();
         return true;

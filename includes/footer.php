@@ -47,6 +47,26 @@
             }
         }
     });
+
+    // Notifications API
+    window.markRead = function(id) {
+        let fd = new FormData();
+        fd.append('action', 'mark_read');
+        fd.append('id', id);
+        fetch('notifications_api.php', { method: 'POST', body: fd });
+    };
+
+    window.markAllRead = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        let fd = new FormData();
+        fd.append('action', 'mark_all_read');
+        fetch('notifications_api.php', { method: 'POST', body: fd }).then(res => res.json()).then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    };
 </script>
 <?php if (!empty($extraScript))
     echo $extraScript; ?>
