@@ -606,7 +606,8 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                 $insMr = $pdo->prepare("INSERT INTO monthly_rates (month, deposit_type_id, rate_percent) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE rate_percent = VALUES(rate_percent)");
                 $insMr->execute([$month, $depositTypeId, ($rate / 100)]);
 
-                $depStmt = $pdo->prepare("SELECT d.* FROM deposits d WHERE d.deposit_type_id = ? AND d.status = 'active'");
+                // Fetch active deposits with a FOR UPDATE lock to prevent race conditions during calculation
+                $depStmt = $pdo->prepare("SELECT d.* FROM deposits d WHERE d.deposit_type_id = ? AND d.status = 'active' FOR UPDATE");
                 $depStmt->execute([$depositTypeId]);
                 $activeDeps = $depStmt->fetchAll();
 
@@ -628,8 +629,10 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
 
                     $pdo->prepare("INSERT INTO profit_cycles (deposit_id, cycle_date, profit_amount, status, created_at) VALUES (?, ?, ?, 'calculated', NOW())")->execute([$dep['id'], $actualCycleDate, $monthlyProfit]);
 
-                    $upDepAccum = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ?, last_profit_date = ? WHERE id = ?");
+                    // Guard update with status='active' at the atomic level
+                    $upDepAccum = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ?, last_profit_date = ? WHERE id = ? AND status = 'active'");
                     $upDepAccum->execute([$monthlyProfit, $actualCycleDate, $dep['id']]);
+                    if ($upDepAccum->rowCount() === 0) continue;
 
                     $accrualReceiptNo = generateReceiptNo($pdo);
                     $pdo->prepare("INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, direction, amount, currency, approval_request_id, date, note) VALUES (?, ?, ?, 'profit_accrual', 'credit', ?, ?, ?, NOW(), ?)")
