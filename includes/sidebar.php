@@ -39,9 +39,10 @@ function sidebarLink(string $href, string $icon, string $label, string $current)
             <?= sidebarLink('users.php', 'person-badge', 'إدارة الموظفين', $currentPage) ?>
             <?php 
             $appEnv = strtolower(trim(getenv('APP_ENV') ?: ($_ENV['APP_ENV'] ?? 'production')));
+            // Link removed: admin_seed_test_data.php does not exist
             if (in_array($appEnv, ['development', 'local', 'testing'], true)): 
             ?>
-                <?= sidebarLink('admin_seed_test_data.php', 'database-fill-gear', 'تفريغ وتعبئة الاختبار', $currentPage) ?>
+                <!-- Debug/Testing tools could be added here -->
             <?php endif; ?>
         <?php endif; ?>
 
