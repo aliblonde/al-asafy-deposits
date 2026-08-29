@@ -26,7 +26,7 @@ class TechnicalExecutionException extends RuntimeException {}
 // Schema Version Guard (Section 9)
 // ═══════════════════════════════════════════
 
-const REQUIRED_SCHEMA_VERSION = 6;
+const REQUIRED_SCHEMA_VERSION = 7;
 
 function getSchemaVersion(PDO $pdo): int
 {
