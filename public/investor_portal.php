@@ -181,7 +181,9 @@ $pageTitle = 'بوابة المستثمر';
 </head>
 
 <body>
-    <!-- Topbar -->
+    <?php
+    $unreadNotifCount = getUnreadNotificationsCount(getPDO(), currentUserId());
+    ?>
     <header class="topbar">
         <div class="d-flex align-items-center justify-content-between w-100 px-3">
             <div class="brand flex-grow-1 text-end" style="letter-spacing: normal;">
@@ -189,8 +191,51 @@ $pageTitle = 'بوابة المستثمر';
                 <span class="text-white fw-bold">بوابة المستثمر</span>
                 <span class="text-gold opacity-75 ms-2">| <?= htmlspecialchars($investorName) ?></span>
             </div>
-            <div class="d-flex align-items-center gap-3">
-                <form method="POST" action="logout.php" class="d-inline">
+            
+            <div class="d-flex align-items-center gap-3" dir="rtl">
+                <!-- Notifications Bell -->
+                <div class="dropdown me-3">
+                    <button class="btn btn-sm btn-outline-secondary border-0 p-1 position-relative" type="button" id="notifDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-bell fs-5 text-white"></i>
+                        <?php if ($unreadNotifCount > 0): ?>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.55rem;">
+                            <?= $unreadNotifCount > 99 ? '99+' : $unreadNotifCount ?>
+                        </span>
+                        <?php endif; ?>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="notifDropdown" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                        <li><h6 class="dropdown-header d-flex justify-content-between align-items-center">
+                            الإشعارات
+                            <?php if ($unreadNotifCount > 0): ?>
+                            <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="markAllRead(event)">تحديد الكل كمقروء</button>
+                            <?php endif; ?>
+                        </h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <?php
+                        $latestNotifs = getLatestNotifications(getPDO(), currentUserId(), 5);
+                        if (empty($latestNotifs)):
+                        ?>
+                            <li><span class="dropdown-item text-center text-muted small">لا توجد إشعارات جديدة</span></li>
+                        <?php else: foreach ($latestNotifs as $n): ?>
+                            <li>
+                                <a class="dropdown-item <?= $n['is_read'] ? 'text-muted' : 'fw-bold' ?>" href="<?= htmlspecialchars($n['link'] ?? '#') ?>" onclick="markRead(<?= $n['id'] ?>)">
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-gold"><?= htmlspecialchars($n['title']) ?></small>
+                                        <small class="text-muted" style="font-size: 0.65rem;"><?= date('m/d H:i', strtotime($n['created_at'])) ?></small>
+                                    </div>
+                                    <div style="font-size: 0.8rem; white-space: normal; line-height: 1.4;"><?= htmlspecialchars($n['message']) ?></div>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                        <?php endforeach; endif; ?>
+                    </ul>
+                </div>
+
+                <button id="themeToggle" class="btn btn-sm btn-outline-secondary border-0 p-1 me-2" title="تغيير المظهر">
+                    <i class="bi bi-brightness-high fs-5 text-warning"></i>
+                </button>
+                
+                <form method="POST" action="logout.php" class="d-inline m-0">
                     <?= csrfField() ?>
                     <button type="submit" class="btn btn-sm btn-outline-danger" title="تسجيل الخروج">
                         <i class="bi bi-box-arrow-right me-1"></i> خروج
@@ -331,7 +376,12 @@ $pageTitle = 'بوابة المستثمر';
         </div>
 
         <!-- Transactions Ledger -->
-        <div class="section-title"><i class="bi bi-list-ul me-1"></i>سجل كشف المعاملات</div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="section-title mb-0"><i class="bi bi-list-ul me-1"></i>سجل الحركات المالية</div>
+            <a href="export_excel.php?report=transactions" class="btn btn-sm btn-outline-success">
+                <i class="bi bi-file-earmark-excel me-1"></i> تصدير Excel
+            </a>
+        </div>
         <div class="table-wrapper mb-4">
             <div class="table-responsive">
                 <table class="table table-dark-custom table-hover mb-0">

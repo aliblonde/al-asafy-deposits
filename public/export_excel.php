@@ -6,11 +6,13 @@ require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
 require_once __DIR__ . '/../config/rbac.php';
 
-requirePermission('reports.export');
-
 $pdo = getPDO();
-
 $userRole = currentRole();
+
+if ($userRole !== 'investor') {
+    requirePermission('reports.export');
+}
+
 if (!in_array($userRole, ['admin', 'staff', 'investor'], true)) {
     http_response_code(403);
     die('<div style="font-family:sans-serif;color:#c00;padding:30px;text-align:center;direction:rtl"><h2>403 — غير مصرح</h2><p>ليس لديك صلاحية للوصول إلى هذا التقرير.</p></div>');
