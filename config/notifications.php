@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // config/notifications.php
 
 require_once __DIR__ . "/db.php";
