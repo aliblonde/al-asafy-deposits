@@ -10,7 +10,7 @@ require_once __DIR__ . '/../config/logger.php';
 
 requireLogin();
 
-$user = currentUser();
+$user = ['role' => currentRole(), 'investor_id' => currentInvestorId()];
 $pdo = getPDO();
 
 $investorId = $user['investor_id'] ?? 0;
