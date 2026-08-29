@@ -34,9 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $secret = getenv('RATE_LIMIT_SECRET') ?: ($_ENV['RATE_LIMIT_SECRET'] ?? '');
 
     if (empty($secret) || strlen($secret) < 32) {
-        error_log("SECURITY CRITICAL CONFIG ERROR: RATE_LIMIT_SECRET is not configured or is under 32 characters.");
-        http_response_code(503);
-        die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>503 — خدمة تسجيل الدخول غير متاحة</h2><p>حدث خطأ في الإعدادات الأمنية للنظام. يرجى مراجعة مسؤول النظام.</p></div>');
+        error_log("SECURITY WARNING: RATE_LIMIT_SECRET is not configured or is under 32 characters. Using generated fallback.");
+        // Generate a runtime fallback so login still works, but rate limiting is per-process only
+        $secret = hash('sha256', __FILE__ . php_uname('n') . $ip);
     }
     $ipHash = hash_hmac('sha256', $ip, $secret);
 

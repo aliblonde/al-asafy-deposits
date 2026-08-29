@@ -8,8 +8,6 @@ require_once __DIR__ . '/../config/logger.php';
 
 requirePermission('investors.view');
 
-requireLogin();
-
 $pdo = getPDO();
 $investorId = (int)($_GET['investor_id'] ?? 0);
 $fileType = $_GET['type'] ?? '';

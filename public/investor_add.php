@@ -129,8 +129,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (strlen($password) < 1)
       $errors[] = 'كلمة المرور مطلوبة لإنشاء الحساب.';
     else {
-      $pwErrors = validatePasswordPolicy($password);
-      if (!empty($pwErrors)) $errors = array_merge($errors, $pwErrors);
+      $pwCheck = validatePasswordPolicy($password);
+      if (!$pwCheck['valid']) $errors[] = $pwCheck['error'];
     }
     if ($username) {
       $chk = $pdo->prepare("SELECT id FROM users WHERE username=?");
@@ -160,9 +160,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if (!userCan('investor_accounts.reset_password')) {
             throw new Exception('ليس لديك صلاحية إعادة تعيين كلمة مرور المستثمر.');
           }
-          $pwErrors = validatePasswordPolicy($password);
-          if (!empty($pwErrors)) {
-            throw new Exception(implode(' ', $pwErrors));
+          $pwCheck = validatePasswordPolicy($password);
+          if (!$pwCheck['valid']) {
+            throw new Exception($pwCheck['error']);
           }
           $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
           $pdo->prepare("UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?")->execute([$hash, $linkedUser['id']]);

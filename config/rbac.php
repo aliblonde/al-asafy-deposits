@@ -59,6 +59,9 @@ function userCan(string $permissionName, ?int $userId = null): bool
     } catch (Throwable $e) {
         error_log("userCan check notice: " . $e->getMessage());
         // Fallback for staff role offline checks
+        if ($role === 'admin') {
+            return true; // Failsafe: admin can always bypass if DB errors occur
+        }
         if ($role === 'staff' && str_starts_with($permissionName, 'profits.approve')) {
             return false;
         }

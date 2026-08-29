@@ -8,7 +8,6 @@ require_once __DIR__ . '/../config/rbac.php';
 
 requirePermission('reports.export');
 
-requireLogin();
 $pdo = getPDO();
 
 $userRole = currentRole();
@@ -89,7 +88,7 @@ if ($receiptNo !== '') {
 } elseif ($report === 'deposits') {
     $where = ['1=1']; $params = [];
     if ($userRole === 'investor' || $investorId > 0) { $where[] = 'd.investor_id=?'; $params[] = $investorId; }
-    $stmt = $pdo->prepare("SELECT d.*, i.full_name, dt.name_ar FROM deposits d JOIN investors i ON i.id=d.investor_id JOIN deposit_types dt ON dt.id=d.deposit_type_id WHERE " . implode(' AND ', $where) . " ORDER BY d.created_at DESC");
+    $stmt = $pdo->prepare("SELECT d.*, i.full_name, dt.name_ar, dt.min_rate FROM deposits d JOIN investors i ON i.id=d.investor_id JOIN deposit_types dt ON dt.id=d.deposit_type_id WHERE " . implode(' AND ', $where) . " ORDER BY d.created_at DESC");
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
     $title = 'تقرير الودائع';

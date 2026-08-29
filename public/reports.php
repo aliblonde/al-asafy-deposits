@@ -57,7 +57,7 @@ if ($receiptNo) {
                 $params[] = $fDateTo;
             }
             $stmt = $pdo->prepare(
-                "SELECT d.*, i.full_name, dt.name_ar, dt.code
+                "SELECT d.*, i.full_name, dt.name_ar, dt.code, dt.min_rate
              FROM deposits d JOIN investors i ON i.id=d.investor_id
              JOIN deposit_types dt ON dt.id=d.deposit_type_id
              WHERE " . implode(' AND ', $where) . " ORDER BY d.created_at DESC"

@@ -8,7 +8,6 @@ require_once __DIR__ . '/../config/rbac.php';
 
 requirePermission('reports.export');
 
-requireLogin();
 $pdo = getPDO();
 
 $userRole = currentRole();
