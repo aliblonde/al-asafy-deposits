@@ -11,7 +11,7 @@ require_once __DIR__ . '/../config/logger.php';
 requirePermission('rates.request_declaration');
 $pdo = getPDO();
 
-$types = $pdo->query("SELECT * FROM deposit_types ORDER BY min_days")->fetchAll();
+$types = $pdo->query("SELECT * FROM deposit_types WHERE is_locked = 0 ORDER BY min_days ASC")->fetchAll();
 $month = $_POST['month'] ?? date('Y-m');
 
 $errors = [];

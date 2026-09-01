@@ -31,10 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_deposit_id']
         setFlash('danger', 'الوديعة غير موجودة أو ملغاة.');
     } elseif ((int)$dep['principal_refunded'] === 1) {
         setFlash('warning', 'عذراً، تم إرجاع رأس المال لهذه الوديعة وتأكيد إنهائها مسبقاً.');
-    } elseif ($dep['end_date'] > date('Y-m-d')) {
-        setFlash('warning', 'لا يمكن تقديم طلب إنهاء الوديعة قبل حلول تاريخ استحقاقها المستحق (' . formatDate($dep['end_date']) . ').');
-    } elseif ((float)$dep['accumulated_profit'] > 0 || isDepositProfitDue($dep) || isDepositMonthlyProfitDue($dep)) {
-        setFlash('warning', 'عفواً، لا يمكن طلب إنهاء الوديعة وإرجاع رأس المال حتى يتم صرف جميع أرباحها التراكمية والشهرية المستحقة أولاً.');
+    } elseif ($dep['end_date'] > date('Y-m-d') && empty($_POST['is_break'])) {
+        setFlash('warning', 'لا يمكن إغلاق هذه الوديعة لأن تاريخ نهايتها لم يحن بعد (' . formatDate($dep['end_date']) . ').');
+    } elseif (((float)$dep['accumulated_profit'] > 0 || isDepositProfitDue($dep) || isDepositMonthlyProfitDue($dep)) && empty($_POST['forfeit_profit'])) {
+        setFlash('warning', 'الوديعة لا تزال لها أرباح متراكمة أو قيد الانتظار لم تسحب. يرجى سحب أو تسوية جميع الأرباح أولاً.');
     } else {
         try {
             // Create Approval Request ONLY (Zero direct execution)
@@ -44,7 +44,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['complete_deposit_id']
                 'deposit',
                 $dId,
                 [
-                    'deposit_id' => $dId
+                    'deposit_id' => $dId,
+                    'is_break' => !empty($_POST['is_break']) ? 1 : 0,
+                    'forfeit_profit' => !empty($_POST['forfeit_profit']) ? 1 : 0
                 ]
             );
 
@@ -262,15 +264,47 @@ include __DIR__ . '/../includes/header.php';
                                                       </a>
                                                   <?php endif; ?>
 
-                                                  <?php if ($isReadyToClose && userCan('deposits.request_close')): ?>
-                                                      <form method="post" class="d-inline m-0" onsubmit="return confirm('هل أنت متأكد من تقديم طلب إنهاء هذه الوديعة وإرجاع مبلغ رأس المال للمستثمر؟');">
-                                                          <?= csrfField() ?>
-                                                          <input type="hidden" name="complete_deposit_id" value="<?= $d['id'] ?>">
-                                                          <button type="submit" class="btn btn-sm btn-danger" title="تقديم طلب إنهاء الوديعة وإرجاع رأس المال">
-                                                              <i class="bi bi-x-octagon"></i> طلب إنهاء
-                                                          </button>
-                                                      </form>
-                                                  <?php endif; ?>
+                                                  <?php if (userCan('deposits.request_close')): ?>
+                                                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#closeModal<?= $d['id'] ?>" title="طلب إنهاء أو كسر الوديعة">
+                                                        <i class="bi bi-x-octagon"></i> إنهاء
+                                                    </button>
+                                                    
+                                                    <div class="modal fade" id="closeModal<?= $d['id'] ?>" tabindex="-1" aria-hidden="true">
+                                                        <div class="modal-dialog">
+                                                            <form method="post" class="modal-content bg-dark">
+                                                                <div class="modal-header border-secondary">
+                                                                    <h5 class="modal-title">طلب إنهاء الوديعة #<?= $d['id'] ?></h5>
+                                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body border-secondary text-start text-white">
+                                                                    <p>هل أنت متأكد من تقديم طلب لإنهاء هذه الوديعة؟</p>
+                                                                    <?= csrfField() ?>
+                                                                    <input type="hidden" name="complete_deposit_id" value="<?= $d['id'] ?>">
+                                                                    
+                                                                    <?php if ($d['end_date'] > date('Y-m-d')): ?>
+                                                                    <div class="form-check mt-3" dir="rtl">
+                                                                        <input class="form-check-input float-end ms-2" type="checkbox" name="is_break" value="1" id="break<?= $d['id'] ?>">
+                                                                        <label class="form-check-label text-warning pe-4" for="break<?= $d['id'] ?>">
+                                                                            تأكيد كسر الوديعة قبل تاريخ الانتهاء (<?= date('Y/m/d', strtotime($d['end_date'])) ?>)
+                                                                        </label>
+                                                                    </div>
+                                                                    <?php endif; ?>
+                                                                    
+                                                                    <div class="form-check mt-2" dir="rtl">
+                                                                        <input class="form-check-input float-end ms-2" type="checkbox" name="forfeit_profit" value="1" id="forfeit<?= $d['id'] ?>">
+                                                                        <label class="form-check-label text-danger pe-4" for="forfeit<?= $d['id'] ?>">
+                                                                            مصادرة جميع الأرباح التراكمية (إرجاع رأس المال فقط)
+                                                                        </label>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer border-secondary">
+                                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                                                                    <button type="submit" class="btn btn-danger">تأكيد الطلب</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                <?php endif; ?>
 
                                                   <?php if (userCan('deposits.update')): ?>
                                                       <a href="deposit_add.php?edit=<?= $d['id'] ?>" class="btn btn-sm btn-outline-gold" title="تعديل الوديعة">

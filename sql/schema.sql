@@ -83,11 +83,12 @@ CREATE TABLE IF NOT EXISTS `user_permissions` (
 CREATE TABLE IF NOT EXISTS `deposit_types` (
   `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `name_ar`    VARCHAR(100) NOT NULL,
-  `code`       ENUM('6_months','1_year','2_years','3_years') NOT NULL,
+  `code`       VARCHAR(50) NOT NULL,
   `min_rate`   DECIMAL(8,5) NOT NULL DEFAULT 0.02800,
   `max_rate`   DECIMAL(8,5) NOT NULL DEFAULT 0.03300,
   `min_days`   INT NOT NULL DEFAULT 180,
   `max_days`   INT NOT NULL DEFAULT 180,
+  `is_locked`  TINYINT(1) NOT NULL DEFAULT 0,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

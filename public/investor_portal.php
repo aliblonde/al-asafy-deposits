@@ -49,7 +49,7 @@ if (!$investor) {
 
 // Fetch Deposits
 $depStmt = $pdo->prepare("
-    SELECT d.*, dt.name_ar AS type_name, dt.code
+    SELECT d.*, dt.name_ar AS type_name, dt.code, dt.is_locked
     FROM deposits d
     JOIN deposit_types dt ON dt.id = d.deposit_type_id
     WHERE d.investor_id = ?
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->beginTransaction();
 
             // Lock deposit FOR UPDATE
-            $stmt = $pdo->prepare("SELECT * FROM deposits WHERE id = ? AND investor_id = ? FOR UPDATE");
+            $stmt = $pdo->prepare("SELECT d.*, dt.is_locked FROM deposits d JOIN deposit_types dt ON dt.id = d.deposit_type_id WHERE d.id = ? AND d.investor_id = ? FOR UPDATE");
             $stmt->execute([$depositId, $investorId]);
             $deposit = $stmt->fetch();
 
@@ -105,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $netAvailable = max(0.00, $accumulated - $totalPendingForDep);
 
+            if ($deposit['is_locked']) { $note = $note ? $note . ' [استثنائي - وديعة مقفلة]' : '[استثنائي - وديعة مقفلة]'; }
             if ($amount > $netAvailable) {
                 throw new Exception('عفواً، رصيد الأرباح المتاح للسحب لهذه الوديعة هو ' . formatMoney($netAvailable, $currency) . ' فقط (بعد خصم الطلبات المعلقة).');
             }
@@ -318,9 +319,7 @@ $pageTitle = 'بوابة المستثمر';
                                 $availableForDep = max(0.00, (float)$d['accumulated_profit'] - $pendingForDep);
                                 if ($availableForDep <= 0) continue;
                                 ?>
-                                <option value="<?= $d['id'] ?>">
-                                    وديعة #<?= $d['id'] ?> (<?= formatMoney($d['amount'], $d['currency']) ?>) — رصيد متاح للسحب: <?= formatMoney($availableForDep, $d['currency']) ?>
-                                </option>
+                                <option value="<?= $d['id'] ?>"><?= "وديعة #" . $d['id'] . " (" . formatMoney($d['amount'], $d['currency']) . ") — ربح متاح: " . formatMoney($availableForDep, $d['currency']) . ($d['is_locked'] ? " [مقفلة - طلب استثنائي]" : "") ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>

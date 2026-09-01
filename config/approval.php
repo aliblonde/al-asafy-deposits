@@ -286,6 +286,8 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
 
             case 'deposits.close':
                 $depositId = (int)($payload['deposit_id'] ?? 0);
+                $isBreak = (int)($payload['is_break'] ?? 0);
+                $forfeitProfit = (int)($payload['forfeit_profit'] ?? 0);
 
                 $depStmt = $pdo->prepare("SELECT * FROM deposits WHERE id = ? FOR UPDATE");
                 $depStmt->execute([$depositId]);
@@ -294,14 +296,27 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                 if (!$deposit) {
                     throw new BusinessRuleException('الوديعة غير موجودة.');
                 }
-                if ($deposit['end_date'] > date('Y-m-d')) {
+                if ($deposit['end_date'] > date('Y-m-d') && empty($isBreak)) {
                     throw new BusinessRuleException('لا يمكن إنهاء الوديعة قبل حلول تاريخ انتهائها.');
                 }
                 if ((int)$deposit['principal_refunded'] === 1) {
                     throw new BusinessRuleException('تم إرجاع رأس المال سابقاً.');
                 }
-                if ((float)$deposit['accumulated_profit'] > 0) {
+                if ((float)$deposit['accumulated_profit'] > 0 && empty($forfeitProfit)) {
                     throw new BusinessRuleException('لا يمكن إنهاء الوديعة قبل صرف كامل الأرباح المتراكمة.');
+                }
+
+                if (!empty($forfeitProfit) && (float)$deposit['accumulated_profit'] > 0) {
+                    $adjReceipt = generateReceiptNo($pdo);
+                    $forfeitedAmount = (float)$deposit['accumulated_profit'];
+                    
+                    $adjTx = $pdo->prepare("
+                        INSERT INTO transactions (receipt_no, investor_id, deposit_id, type, direction, amount, currency, approval_request_id, date, note)
+                        VALUES (?, ?, ?, 'deposit_adjustment', 'debit', ?, ?, ?, NOW(), ?)
+                    ");
+                    $adjTx->execute([$adjReceipt, $deposit['investor_id'], $depositId, $forfeitedAmount, $deposit['currency'], $requestId, 'مصادرة الأرباح التراكمية (كسر وديعة)']);
+                    
+                    $pdo->prepare("UPDATE deposits SET accumulated_profit = 0 WHERE id = ?")->execute([$depositId]);
                 }
 
                 $receiptNo = generateReceiptNo($pdo);
