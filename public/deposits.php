@@ -271,12 +271,12 @@ include __DIR__ . '/../includes/header.php';
                                                     
                                                     <div class="modal fade" id="closeModal<?= $d['id'] ?>" tabindex="-1" aria-hidden="true">
                                                         <div class="modal-dialog">
-                                                            <form method="post" class="modal-content bg-dark">
-                                                                <div class="modal-header border-secondary">
+                                                            <form method="post" class="modal-content">
+                                                                <div class="modal-header">
                                                                     <h5 class="modal-title">طلب إنهاء الوديعة #<?= $d['id'] ?></h5>
-                                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                                 </div>
-                                                                <div class="modal-body border-secondary text-start text-white">
+                                                                <div class="modal-body text-start">
                                                                     <p>هل أنت متأكد من تقديم طلب لإنهاء هذه الوديعة؟</p>
                                                                     <?= csrfField() ?>
                                                                     <input type="hidden" name="complete_deposit_id" value="<?= $d['id'] ?>">
@@ -284,7 +284,7 @@ include __DIR__ . '/../includes/header.php';
                                                                     <?php if ($d['end_date'] > date('Y-m-d')): ?>
                                                                     <div class="form-check mt-3" dir="rtl">
                                                                         <input class="form-check-input float-end ms-2" type="checkbox" name="is_break" value="1" id="break<?= $d['id'] ?>">
-                                                                        <label class="form-check-label text-warning pe-4" for="break<?= $d['id'] ?>">
+                                                                        <label class="form-check-label fw-bold text-danger pe-4" for="break<?= $d['id'] ?>">
                                                                             تأكيد كسر الوديعة قبل تاريخ الانتهاء (<?= date('Y/m/d', strtotime($d['end_date'])) ?>)
                                                                         </label>
                                                                     </div>
@@ -292,12 +292,12 @@ include __DIR__ . '/../includes/header.php';
                                                                     
                                                                     <div class="form-check mt-2" dir="rtl">
                                                                         <input class="form-check-input float-end ms-2" type="checkbox" name="forfeit_profit" value="1" id="forfeit<?= $d['id'] ?>">
-                                                                        <label class="form-check-label text-danger pe-4" for="forfeit<?= $d['id'] ?>">
+                                                                        <label class="form-check-label text-danger fw-bold pe-4" for="forfeit<?= $d['id'] ?>">
                                                                             مصادرة جميع الأرباح التراكمية (إرجاع رأس المال فقط)
                                                                         </label>
                                                                     </div>
                                                                 </div>
-                                                                <div class="modal-footer border-secondary">
+                                                                <div class="modal-footer">
                                                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                                                                     <button type="submit" class="btn btn-danger">تأكيد الطلب</button>
                                                                 </div>
