@@ -232,6 +232,7 @@ $pageTitle = 'بوابة المستثمر';
                     </ul>
                 </div>
 
+                <a href="change_password.php" class="btn btn-sm btn-outline-secondary border-0 p-1 me-2" title="تغيير كلمة المرور"><i class="bi bi-key fs-5 text-secondary"></i></a>
                 <button id="themeToggle" class="btn btn-sm btn-outline-secondary border-0 p-1 me-2" title="تغيير المظهر">
                     <i class="bi bi-brightness-high fs-5 text-warning"></i>
                 </button>
