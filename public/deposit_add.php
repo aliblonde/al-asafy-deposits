@@ -270,7 +270,7 @@ include __DIR__ . '/../includes/header.php';
                                     <select name="deposit_type_id" id="depositTypeSelect" class="form-select" required>
                                         <option value="">— اختر النوع —</option>
                                         <?php foreach ($depositTypes as $dt): ?>
-                                            <option value="<?= $dt['id'] ?>" data-code="<?= $dt['code'] ?>"
+                                            <option value="<?= $dt['id'] ?>" data-code="<?= $dt['code'] ?>" data-locked="<?= $dt['is_locked'] ?? 0 ?>"
                                                 <?= (int) ($form['deposit_type_id'] ?? 0) === (int) $dt['id'] ? 'selected' : '' ?>>
                                                 <?= htmlspecialchars($dt['name_ar']) ?>
                                             </option>
@@ -303,12 +303,15 @@ include __DIR__ . '/../includes/header.php';
                                 <!-- Payout Frequency -->
                                 <div class="col-md-6">
                                     <label class="form-label">دورية سحب الأرباح التراكمية <span class="text-danger">*</span></label>
-                                    <select name="profit_payout_frequency" class="form-select" required>
+                                    <select name="profit_payout_frequency" id="profitPayoutFrequency" class="form-select" required>
                                         <option value="1" <?= (int)($form['profit_payout_frequency'] ?? 1) === 1 ? 'selected' : '' ?>>كل شهر</option>
                                         <option value="2" <?= (int)($form['profit_payout_frequency'] ?? 1) === 2 ? 'selected' : '' ?>>كل شهرين</option>
                                         <option value="3" <?= (int)($form['profit_payout_frequency'] ?? 1) === 3 ? 'selected' : '' ?>>كل 3 أشهر</option>
                                         <option value="6" <?= (int)($form['profit_payout_frequency'] ?? 1) === 6 ? 'selected' : '' ?>>كل 6 أشهر</option>
                                         <option value="12" <?= (int)($form['profit_payout_frequency'] ?? 1) === 12 ? 'selected' : '' ?>>كل سنة</option>
+                                        <option value="24" <?= (int)($form['profit_payout_frequency'] ?? 1) === 24 ? 'selected' : '' ?>>سنتان (مقفلة)</option>
+                                        <option value="36" <?= (int)($form['profit_payout_frequency'] ?? 1) === 36 ? 'selected' : '' ?>>3 سنوات (مقفلة)</option>
+                                        <option value="60" <?= (int)($form['profit_payout_frequency'] ?? 1) === 60 ? 'selected' : '' ?>>5 سنوات (مقفلة)</option>
                                     </select>
                                 </div>
                             </div>
@@ -329,4 +332,51 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelect = document.getElementById('depositTypeSelect');
+    const freqSelect = document.getElementById('profitPayoutFrequency');
+    
+    function updateFrequency() {
+        const selected = typeSelect.options[typeSelect.selectedIndex];
+        if (!selected || selected.value === '') {
+            freqSelect.disabled = false;
+            return;
+        }
+        
+        const isLocked = selected.getAttribute('data-locked') === '1';
+        const code = selected.getAttribute('data-code');
+        
+        if (isLocked) {
+            let months = 12;
+            if (code === 'locked_1_year') months = 12;
+            if (code === 'locked_2_years') months = 24;
+            if (code === 'locked_3_years') months = 36;
+            if (code === 'locked_5_years') months = 60;
+            
+            freqSelect.value = months;
+            freqSelect.disabled = true;
+            
+            let hiddenInput = document.getElementById('hidden_profit_payout_frequency');
+            if (!hiddenInput) {
+                hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'profit_payout_frequency';
+                hiddenInput.id = 'hidden_profit_payout_frequency';
+                freqSelect.parentNode.appendChild(hiddenInput);
+            }
+            hiddenInput.value = months;
+        } else {
+            freqSelect.disabled = false;
+            let hiddenInput = document.getElementById('hidden_profit_payout_frequency');
+            if (hiddenInput) {
+                hiddenInput.remove();
+            }
+        }
+    }
+    
+    typeSelect.addEventListener('change', updateFrequency);
+    updateFrequency(); 
+});
+</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
