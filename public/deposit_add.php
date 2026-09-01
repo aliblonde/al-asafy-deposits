@@ -347,12 +347,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const isLocked = selected.getAttribute('data-locked') === '1';
         const code = selected.getAttribute('data-code');
         
+        // Hide locked options for normal deposits
+        Array.from(freqSelect.options).forEach(opt => {
+            const v = parseInt(opt.value);
+            if (v >= 24) {
+                if (isLocked) {
+                    opt.hidden = false;
+                    opt.disabled = false;
+                } else {
+                    opt.hidden = true;
+                    opt.disabled = true;
+                }
+            }
+        });
+        
         if (isLocked) {
             let months = 12;
-            if (code === 'locked_1_year') months = 12;
-            if (code === 'locked_2_years') months = 24;
-            if (code === 'locked_3_years') months = 36;
-            if (code === 'locked_5_years') months = 60;
+            if (code === 'asaify_start_1y') months = 12;
+            if (code === 'asaify_advance_2y') months = 24;
+            if (code === 'asaify_prestige_3y') months = 36;
+            if (code === 'asaify_signature_5y') months = 60;
             
             freqSelect.value = months;
             freqSelect.disabled = true;
@@ -368,6 +382,9 @@ document.addEventListener('DOMContentLoaded', function() {
             hiddenInput.value = months;
         } else {
             freqSelect.disabled = false;
+            if (parseInt(freqSelect.value) >= 24) {
+                freqSelect.value = "1";
+            }
             let hiddenInput = document.getElementById('hidden_profit_payout_frequency');
             if (hiddenInput) {
                 hiddenInput.remove();
