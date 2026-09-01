@@ -91,8 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'نوع الوديعة غير صالح.';
     }
 
-    if ($payoutFrequency < 1 || $payoutFrequency > 12) {
-        $errors[] = 'دورية صرف الأرباح يجب أن تكون بين شهر و 12 شهراً.';
+    if ($payoutFrequency < 1 || $payoutFrequency > 60) {
+        $errors[] = 'دورية صرف الأرباح يجب أن تكون بين شهر و 60 شهراً.';
     }
 
     $endDate = null;
