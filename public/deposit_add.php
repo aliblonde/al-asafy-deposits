@@ -363,10 +363,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (isLocked) {
             let months = 12;
-            if (code === 'asaify_start_1y') months = 12;
-            if (code === 'asaify_advance_2y') months = 24;
-            if (code === 'asaify_prestige_3y') months = 36;
-            if (code === 'asaify_signature_5y') months = 60;
+            if (code === 'L1Y' || code === 'asaify_start_1y') months = 12;
+            if (code === 'L2Y' || code === 'asaify_advance_2y') months = 24;
+            if (code === 'L3Y' || code === 'asaify_prestige_3y') months = 36;
+            if (code === 'L5Y' || code === 'asaify_signature_5y') months = 60;
             
             freqSelect.value = months;
             freqSelect.disabled = true;
