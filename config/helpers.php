@@ -316,3 +316,18 @@ function getSafeErrorMessage(Throwable $e, string $userMessage = 'تعذر تن�
     error_log("[$errorRef] " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
     return $userMessage . " (رمز الخطأ: $errorRef)";
 }
+
+/**
+ * Translate operation types to Arabic.
+ */
+function arabicOperationType(string $type): string {
+    return match ($type) {
+        'profits.payout' => 'صرف أرباح',
+        'profits.manual' => 'إضافة أرباح يدوية',
+        'deposits.close' => 'إغلاق وديعة',
+        'deposits.financial_change' => 'تعديل مالي (إضافة/سحب)',
+        'withdrawals.approve' => 'طلب سحب أرباح',
+        'rates.declaration' => 'إعلان نسب الأرباح',
+        default => $type
+    };
+}

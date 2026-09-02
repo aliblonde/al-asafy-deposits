@@ -126,7 +126,7 @@ include __DIR__ . '/../includes/header.php';
                                 ?>
                                 <tr>
                                     <td><?= $r['id'] ?></td>
-                                    <td><span class="badge bg-secondary font-monospace"><?= htmlspecialchars($r['operation_type']) ?></span></td>
+                                    <td><span class="badge bg-primary"><?= arabicOperationType($r['operation_type']) ?></span></td>
                                     <td><?= htmlspecialchars($r['entity_type']) ?> #<?= $r['entity_id'] ?: '—' ?></td>
                                     <td class="fw-bold"><?= htmlspecialchars($r['requester_name'] ?: 'مستثمر / نظام') ?></td>
                                     <td><?= formatDate($r['created_at']) ?></td>
