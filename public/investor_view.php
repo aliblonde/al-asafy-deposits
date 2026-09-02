@@ -291,8 +291,52 @@ include __DIR__ . '/../includes/header.php';
                                 <div class="alert alert-secondary py-3 text-center small mb-0">
                                     <i class="bi bi-exclamation-circle me-1"></i> لم يتم رفع الهوية
                                 </div>
+                                                        <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- Extra Attachments -->
+                    <div class="form-card mb-4">
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                            <h5 class="section-title mb-0">
+                                <i class="bi bi-paperclip me-2"></i>المرفقات الإضافية
+                            </h5>
+                            <?php if (userCan('investors.edit')): ?>
+                                <button type="button" class="btn btn-sm btn-gold" data-bs-toggle="modal" data-bs-target="#uploadAttModal">
+                                    <i class="bi bi-plus-lg"></i> إضافة
+                                </button>
                             <?php endif; ?>
                         </div>
+
+                        <?php if (empty($extraAttachments)): ?>
+                            <div class="alert alert-secondary text-center small mb-0">
+                                <i class="bi bi-info-circle me-1"></i> لا توجد مرفقات إضافية
+                            </div>
+                        <?php else: ?>
+                            <ul class="list-group list-group-flush" style="direction: rtl;">
+                                <?php foreach ($extraAttachments as $att): ?>
+                                    <li class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center border-secondary">
+                                        <div>
+                                            <i class="bi bi-file-earmark me-2 text-gold"></i>
+                                            <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="text-white text-decoration-none" style="color:var(--text-color) !important;">
+                                                <?= htmlspecialchars($att['title']) ?>
+                                            </a>
+                                            <div class="small text-muted" style="font-size:0.75rem;margin-right:24px;">
+                                                <?= date('Y-m-d', strtotime($att['created_at'])) ?>
+                                            </div>
+                                        </div>
+                                        <?php if (userCan('investors.edit')): ?>
+                                            <form method="POST" action="" class="m-0 p-0" onsubmit="return confirm('هل أنت متأكد من حذف هذا المرفق؟');">
+                                                <?= csrfField() ?>
+                                                <input type="hidden" name="action" value="delete_attachment">
+                                                <input type="hidden" name="attachment_id" value="<?= $att['id'] ?>">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger border-0"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
                     </div>
 
                     <div class="form-card">
@@ -367,6 +411,36 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="mb-3">
                     <label class="form-label text-white">الملف <span class="text-danger">*</span></label>
+                    <input type="file" name="attachment_file" class="form-control" required accept=".pdf,.jpg,.jpeg,.png,.zip,.rar">
+                    <small class="text-muted d-block mt-1">المسموح: PDF, JPG, PNG, ZIP, RAR (الحد الأقصى 50 ميجا)</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" class="btn btn-gold">رفع وحفظ</button>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+<?php if (userCan('investors.edit')): ?>
+<!-- Upload Attachment Modal -->
+<div class="modal fade" id="uploadAttModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="" enctype="multipart/form-data" class="modal-content text-start" dir="rtl">
+            <div class="modal-header">
+                <h5 class="modal-title">إضافة مرفق جديد للمستثمر</h5>
+                <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="add_attachment">
+                <div class="mb-3">
+                    <label class="form-label text-white" style="color:var(--text-color) !important;">اسم/نوع المرفق <span class="text-danger">*</span></label>
+                    <input type="text" name="title" class="form-control" required placeholder="مثال: عقد إضافي، إيصال تحويل، الخ...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-white" style="color:var(--text-color) !important;">الملف <span class="text-danger">*</span></label>
                     <input type="file" name="attachment_file" class="form-control" required accept=".pdf,.jpg,.jpeg,.png,.zip,.rar">
                     <small class="text-muted d-block mt-1">المسموح: PDF, JPG, PNG, ZIP, RAR (الحد الأقصى 50 ميجا)</small>
                 </div>
