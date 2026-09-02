@@ -17,9 +17,10 @@ if ($search) {
 }
 
 $stmt = $pdo->prepare(
-    "SELECT i.*,
-            COUNT(d.id)                                        AS total_deposits,
-            COALESCE(SUM(CASE WHEN d.status='active' THEN d.amount END), 0) AS active_balance
+        "SELECT i.*,
+            COUNT(d.id) AS total_deposits,
+            COALESCE(SUM(CASE WHEN d.status='active' AND d.currency='USD' THEN d.amount END), 0) AS active_usd,
+            COALESCE(SUM(CASE WHEN d.status='active' AND d.currency='IQD' THEN d.amount END), 0) AS active_iqd
      FROM investors i
      LEFT JOIN deposits d ON d.investor_id = i.id
      WHERE " . implode(' AND ', $where) . "
@@ -103,7 +104,16 @@ include __DIR__ . '/../includes/header.php';
                                         </span>
                                     </td>
                                     <td class="text-gold fw-bold">
-                                        <?= formatMoney($inv['active_balance']) ?>
+                                        <?php if ($inv['active_usd'] > 0 || ($inv['active_iqd'] == 0 && $inv['active_usd'] == 0)): ?>
+                                            <div <?= ($inv['active_iqd'] > 0) ? 'class="mb-1"' : '' ?>>
+                                                <?= formatMoney($inv['active_usd'], 'USD') ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if ($inv['active_iqd'] > 0): ?>
+                                            <div>
+                                                <?= formatMoney($inv['active_iqd'], 'IQD') ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <?= date('d/m/Y', strtotime($inv['created_at'])) ?>
