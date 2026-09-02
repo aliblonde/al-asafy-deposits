@@ -47,14 +47,14 @@ function handleUpload($fileKey, $targetDir, $currentPath = '')
   }
 
   $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-  $allowedExts = ['pdf', 'jpg', 'jpeg', 'png'];
+  $allowedExts = ['pdf', 'jpg', 'jpeg', 'png', 'zip', 'rar'];
 
   if (!in_array($ext, $allowedExts, true)) {
-    throw new Exception("نوع ملف غير مسموح به لـ $fileKey. المسموح: PDF, JPG, PNG");
+    throw new Exception("نوع ملف غير مسموح به لـ $fileKey. المسموح: PDF, JPG, PNG, ZIP, RAR");
   }
 
-  if ($file['size'] > 5 * 1024 * 1024) { // 5MB
-    throw new Exception("حجم الملف كبير جداً. الحد الأقصى 5MB.");
+  if ($file['size'] > 50 * 1024 * 1024) { // 50MB
+    throw new Exception("حجم الملف كبير جداً. الحد الأقصى 50MB.");
   }
 
   // MIME Type Validation Guard

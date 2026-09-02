@@ -22,6 +22,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $action = $_POST['action'] ?? '';
     
+        if ($action === 'add_attachment') {
+        if (!userCan('investors.edit')) {
+            http_response_code(403);
+            setFlash('danger', 'لا تملك صلاحية لرفع مرفقات.');
+        } else {
+            $title = trim($_POST['title'] ?? 'مرفق إضافي');
+            $file = $_FILES['attachment_file'] ?? null;
+            if ($file && $file['error'] === UPLOAD_ERR_OK) {
+                if ($file['size'] > 50 * 1024 * 1024) {
+                    setFlash('danger', 'حجم الملف يتجاوز 50 ميجا.');
+                } else {
+                    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                    if (!in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'zip', 'rar'])) {
+                        setFlash('danger', 'النوع غير مدعوم. المسموح: PDF, JPG, PNG, ZIP, RAR');
+                    } else {
+                        $dest = 'uploads/investors/att_' . uniqid() . '_' . basename($file['name']);
+                        if (move_uploaded_file($file['tmp_name'], __DIR__ . '/../' . $dest)) {
+                            $stmt = $pdo->prepare("INSERT INTO investor_attachments (investor_id, title, file_path, uploaded_by) VALUES (?, ?, ?, ?)");
+                            $stmt->execute([$id, $title, $dest, currentUserId()]);
+                            setFlash('success', 'تم رفع المرفق بنجاح.');
+                        } else {
+                            setFlash('danger', 'فشل في حفظ الملف.');
+                        }
+                    }
+                }
+            } else {
+                setFlash('danger', 'يرجى اختيار ملف صالح.');
+            }
+        }
+        header('Location: investor_view.php?id=' . $id);
+        exit;
+    }
+    
+    if ($action === 'delete_attachment') {
+        if (!userCan('investors.edit')) {
+            http_response_code(403);
+            setFlash('danger', 'لا تملك صلاحية للحذف.');
+        } else {
+            $attId = (int)($_POST['attachment_id'] ?? 0);
+            $stmt = $pdo->prepare("SELECT file_path FROM investor_attachments WHERE id = ? AND investor_id = ?");
+            $stmt->execute([$attId, $id]);
+            $att = $stmt->fetch();
+            if ($att) {
+                @unlink(__DIR__ . '/../' . $att['file_path']);
+                $pdo->prepare("DELETE FROM investor_attachments WHERE id = ?")->execute([$attId]);
+                setFlash('success', 'تم حذف المرفق.');
+            }
+        }
+        header('Location: investor_view.php?id=' . $id);
+        exit;
+    }
+    
     if ($action === 'reset_password') {
         // Section 4: Require explicit permission for password reset
         if (!userCan('investor_accounts.reset_password')) {
@@ -297,6 +349,36 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
         </div>
-        <?php include __DIR__ . '/../includes/footer.php'; ?>
+        <?php if (userCan('investors.edit')): ?>
+<!-- Upload Attachment Modal -->
+<div class="modal fade" id="uploadAttModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="" enctype="multipart/form-data" class="modal-content text-start" dir="rtl">
+            <div class="modal-header">
+                <h5 class="modal-title">إضافة مرفق جديد للمستثمر</h5>
+                <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="add_attachment">
+                <div class="mb-3">
+                    <label class="form-label text-white">اسم/نوع المرفق <span class="text-danger">*</span></label>
+                    <input type="text" name="title" class="form-control" required placeholder="مثال: عقد إضافي، إيصال تحويل، الخ...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-white">الملف <span class="text-danger">*</span></label>
+                    <input type="file" name="attachment_file" class="form-control" required accept=".pdf,.jpg,.jpeg,.png,.zip,.rar">
+                    <small class="text-muted d-block mt-1">المسموح: PDF, JPG, PNG, ZIP, RAR (الحد الأقصى 50 ميجا)</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" class="btn btn-gold">رفع وحفظ</button>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+<?php include __DIR__ . '/../includes/footer.php'; ?>
     </div>
 </div>
