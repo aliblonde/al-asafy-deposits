@@ -401,7 +401,7 @@ include __DIR__ . '/../includes/header.php';
                 <ul class="list-group list-group-flush bg-transparent">
                   <?php foreach ($extraAttachments as $att): ?>
                     <li class="list-group-item bg-transparent text-white border-secondary d-flex justify-content-between align-items-center px-0">
-                      <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="text-decoration-none text-white">
+                      <a href="download_file.php?investor_id=<?= $editId ?>&type=extra_attachment&attachment_id=<?= $att['id'] ?>" target="_blank" class="text-decoration-none text-white">
                         <i class="bi bi-file-earmark me-2 text-gold"></i><?= htmlspecialchars($att['title']) ?>
                       </a>
                       <label class="text-danger small ms-3" style="cursor: pointer;">

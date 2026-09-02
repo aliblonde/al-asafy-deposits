@@ -12,7 +12,7 @@ $pdo = getPDO();
 $investorId = (int)($_GET['investor_id'] ?? 0);
 $fileType = $_GET['type'] ?? '';
 
-if (!$investorId || !in_array($fileType, ['contract', 'id_card'], true)) {
+if (!$investorId || !in_array($fileType, ['contract', 'id_card', 'extra_attachment'], true)) {
     http_response_code(400);
     die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>400 — طلب غير صالح</h2><p>معلمات الملف المطلوبة غير صحيحة.</p></div>');
 }
@@ -42,7 +42,23 @@ if (!$investor) {
     die('<div style="font-family:sans-serif;color:#721c24;padding:30px;direction:rtl"><h2>404 — غير موجود</h2><p>سجل المستثمر غير موجود.</p></div>');
 }
 
-$relativePath = ($fileType === 'contract') ? $investor['contract_path'] : $investor['id_card_path'];
+$relativePath = '';
+if ($fileType === 'contract') {
+    $relativePath = $investor['contract_path'];
+} elseif ($fileType === 'id_card') {
+    $relativePath = $investor['id_card_path'];
+} elseif ($fileType === 'extra_attachment') {
+    $attId = (int)($_GET['attachment_id'] ?? 0);
+    if ($attId) {
+        $sAtt = $pdo->prepare("SELECT file_path, title FROM investor_attachments WHERE id = ? AND investor_id = ?");
+        $sAtt->execute([$attId, $investorId]);
+        $att = $sAtt->fetch();
+        if ($att) {
+            $relativePath = $att['file_path'];
+            $extraAttTitle = $att['title'];
+        }
+    }
+}
 
 if (empty($relativePath)) {
     http_response_code(404);
@@ -64,13 +80,20 @@ $finfo = finfo_open(FILEINFO_MIME_TYPE);
 $mimeType = finfo_file($finfo, $fullFilePath);
 finfo_close($finfo);
 
-$allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/pjpeg'];
+$allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/pjpeg', 'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/vnd.rar'];
 if (!in_array($mimeType, $allowedMimes, true)) {
     $mimeType = 'application/octet-stream';
 }
 
 $ext = pathinfo($fullFilePath, PATHINFO_EXTENSION);
-$safeFilename = ($fileType === 'contract' ? 'Contract_' : 'ID_Card_') . $investorId . '.' . $ext;
+if ($fileType === 'contract') {
+    $safeFilename = 'Contract_' . $investorId . '.' . $ext;
+} elseif ($fileType === 'id_card') {
+    $safeFilename = 'ID_Card_' . $investorId . '.' . $ext;
+} else {
+    $safeTitle = preg_replace('/[^a-zA-Z0-9_\x{0600}-\x{06FF}]/u', '_', $extraAttTitle ?? 'Attachment');
+    $safeFilename = $safeTitle . '_' . $investorId . '.' . $ext;
+}
 
 // Security & Download Headers
 header('Content-Description: File Transfer');

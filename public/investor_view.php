@@ -327,7 +327,7 @@ include __DIR__ . '/../includes/header.php';
                                     <li class="list-group-item bg-transparent px-0 d-flex justify-content-between align-items-center border-secondary">
                                         <div>
                                             <i class="bi bi-file-earmark me-2 text-gold"></i>
-                                            <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="text-white text-decoration-none" style="color:var(--text-color) !important;">
+                                            <a href="download_file.php?investor_id=<?= $id ?>&type=extra_attachment&attachment_id=<?= $att['id'] ?>" target="_blank" class="text-white text-decoration-none" style="color:var(--text-color) !important;">
                                                 <?= htmlspecialchars($att['title']) ?>
                                             </a>
                                             <div class="small text-muted" style="font-size:0.75rem;margin-right:24px;">
