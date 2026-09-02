@@ -419,5 +419,29 @@ $pageTitle = 'بوابة المستثمر';
         نظام إدارة الودائع الاستثمارية &copy; <?= date('Y') ?> — العسافي للاستثمارات
     </footer>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const themeToggleBtn = document.getElementById('themeToggle');
+            if (themeToggleBtn) {
+                updateThemeIcon(document.documentElement.getAttribute('data-theme'));
+                themeToggleBtn.addEventListener('click', () => {
+                    let currentTheme = document.documentElement.getAttribute('data-theme');
+                    let newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('theme', newTheme);
+                    updateThemeIcon(newTheme);
+                });
+            }
+            function updateThemeIcon(theme) {
+                if (!themeToggleBtn) return;
+                const icon = themeToggleBtn.querySelector('i');
+                if (theme === 'light') {
+                    icon.className = 'bi bi-moon-fill fs-5 text-dark';
+                } else {
+                    icon.className = 'bi bi-brightness-high fs-5 text-warning';
+                }
+            }
+        });
+    </script>
 </body>
 </html>
