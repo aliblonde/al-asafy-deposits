@@ -12,11 +12,11 @@ try {
     $pdo = getPDO();
     $sql = "
     CREATE TABLE IF NOT EXISTS `investor_attachments` (
-        `id` INT AUTO_INCREMENT PRIMARY KEY,
-        `investor_id` INT NOT NULL,
+        `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        `investor_id` INT UNSIGNED NOT NULL,
         `title` VARCHAR(255) NOT NULL,
         `file_path` VARCHAR(255) NOT NULL,
-        `uploaded_by` INT NOT NULL,
+        `uploaded_by` INT UNSIGNED NOT NULL,
         `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (`investor_id`) REFERENCES `investors`(`id`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
