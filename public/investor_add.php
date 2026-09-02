@@ -14,11 +14,18 @@ $editId = (int) ($_GET['edit'] ?? 0);
 $investor = null;
 $linkedUser = null;
 
-if ($editId) {
-  $s = $pdo->prepare("SELECT * FROM investors WHERE id=?");
-  $s->execute([$editId]);
-  $investor = $s->fetch();
-  if (!$investor) {
+$extraAttachments = [];
+  if ($editId) {
+    $s = $pdo->prepare("SELECT * FROM investors WHERE id=?");
+    $s->execute([$editId]);
+    $investor = $s->fetch();
+
+    if ($investor) {
+        $sAtt = $pdo->prepare("SELECT * FROM investor_attachments WHERE investor_id = ?");
+        $sAtt->execute([$editId]);
+        $extraAttachments = $sAtt->fetchAll();
+    }
+    if (!$investor) {
     header('Location: investors.php');
     exit;
   }
@@ -230,7 +237,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->commit();
         setFlash('success', 'تم إضافة المستثمر' . ($createUser ? ' وحساب الدخول' : '') . ' بنجاح.');
       }
-      header('Location: investors.php');
+              $investorIdForAttachments = $editId ?: ($newId ?? 0);
+        if ($investorIdForAttachments) {
+            if (!empty($_POST['delete_attachments']) && is_array($_POST['delete_attachments'])) {
+                foreach ($_POST['delete_attachments'] as $delId) {
+                    $delId = (int)$delId;
+                    $stmt = $pdo->prepare("SELECT file_path FROM investor_attachments WHERE id = ? AND investor_id = ?");
+                    $stmt->execute([$delId, $investorIdForAttachments]);
+                    $att = $stmt->fetch();
+                    if ($att) {
+                        @unlink(__DIR__ . '/../' . $att['file_path']);
+                        $pdo->prepare("DELETE FROM investor_attachments WHERE id = ?")->execute([$delId]);
+                    }
+                }
+            }
+            if (!empty($_FILES['extra_attachments']['name'][0])) {
+                $count = count($_FILES['extra_attachments']['name']);
+                for ($i = 0; $i < $count; $i++) {
+                    if ($_FILES['extra_attachments']['error'][$i] === UPLOAD_ERR_OK) {
+                        $ext = strtolower(pathinfo($_FILES['extra_attachments']['name'][$i], PATHINFO_EXTENSION));
+                        if (in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'zip', 'rar'])) {
+                            if ($_FILES['extra_attachments']['size'][$i] <= 50 * 1024 * 1024) {
+                                $originalName = basename($_FILES['extra_attachments']['name'][$i]);
+                                $dest = 'uploads/investors/att_' . uniqid() . '_' . $originalName;
+                                if (move_uploaded_file($_FILES['extra_attachments']['tmp_name'][$i], __DIR__ . '/../' . $dest)) {
+                                    $stmt = $pdo->prepare("INSERT INTO investor_attachments (investor_id, title, file_path, uploaded_by) VALUES (?, ?, ?, ?)");
+                                    $stmt->execute([$investorIdForAttachments, $originalName, $dest, currentUserId()]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        header('Location: investors.php');
       exit;
     } catch (\Exception $e) {
       $pdo->rollBack();
@@ -346,7 +386,36 @@ include __DIR__ . '/../includes/header.php';
         </div>
       </div>
 
-      <?php if (!$editId): ?>
+              <div class="row mb-4">
+          <div class="col-12">
+            <h5 class="section-title border-bottom pb-2 mb-3">
+              <i class="bi bi-paperclip me-2"></i>المرفقات الإضافية
+            </h5>
+            <label class="form-label text-warning mb-2">إضافة مرفقات جديدة (يمكنك تحديد أكثر من ملف)</label>
+            <input type="file" name="extra_attachments[]" class="form-control" multiple accept=".pdf,.jpg,.jpeg,.png,.zip,.rar">
+            <small class="text-muted d-block mt-1">المسموح: PDF, JPG, PNG, ZIP, RAR (الحد الأقصى 50 ميجا لكل ملف)</small>
+            
+            <?php if ($editId && !empty($extraAttachments)): ?>
+              <div class="mt-4 p-3 border border-secondary rounded">
+                <strong class="d-block mb-3 text-gold">المرفقات الحالية للمستثمر:</strong>
+                <ul class="list-group list-group-flush bg-transparent">
+                  <?php foreach ($extraAttachments as $att): ?>
+                    <li class="list-group-item bg-transparent text-white border-secondary d-flex justify-content-between align-items-center px-0">
+                      <a href="<?= htmlspecialchars($att['file_path']) ?>" target="_blank" class="text-decoration-none text-white">
+                        <i class="bi bi-file-earmark me-2 text-gold"></i><?= htmlspecialchars($att['title']) ?>
+                      </a>
+                      <label class="text-danger small ms-3" style="cursor: pointer;">
+                        <input type="checkbox" name="delete_attachments[]" value="<?= $att['id'] ?>"> حذف المرفق
+                      </label>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              </div>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <?php if (!$editId): ?>
         <!-- User Account -->
         <hr style="border-color:var(--border);margin:24px 0">
         <h5 class="mb-3" style="color:var(--gold)"><i class="bi bi-key me-2"></i>حساب الدخول (اختياري)</h5>
