@@ -93,7 +93,7 @@ foreach ($activeDeposits as $dep) {
 
 // ── Latest 10 deposits ──────────────────────────────────────
 $latestDeposits = $pdo->query(
-    "SELECT d.id, d.amount, d.start_date, d.end_date, dt.min_rate AS profit_rate_monthly, d.status,
+    "SELECT d.id, d.amount, d.currency, d.start_date, d.end_date, dt.min_rate AS profit_rate_monthly, d.status,
             d.last_profit_date,
             i.full_name,
             dt.name_ar, dt.code
