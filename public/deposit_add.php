@@ -123,18 +123,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'new_profit_payout_frequency' => $payoutFrequency
                 ];
 
-                $reqId = createApprovalRequest(
-                    $pdo,
-                    'deposits.financial_change',
-                    'deposit',
-                    $editId,
-                    $payload,
-                    $deposit
-                );
+                if (currentRole() === 'admin') {
+                    // Direct update for Admin (Bypass approvals)
+                    $upd = $pdo->prepare("
+                        UPDATE deposits 
+                        SET investor_id=?, deposit_type_id=?, amount=?, currency=?, start_date=?, end_date=?, profit_payout_frequency=? 
+                        WHERE id=?
+                    ");
+                    $upd->execute([
+                        $form['investor_id'],
+                        $form['deposit_type_id'],
+                        $amount,
+                        $form['currency'],
+                        $startDateStr,
+                        $endDateStr,
+                        $payoutFrequency,
+                        $editId
+                    ]);
+                    
+                    // Log adjustment if amount changed
+                    if ((float)$amount !== (float)$deposit['amount']) {
+                        $diff = $amount - $deposit['amount'];
+                        $direction = $diff > 0 ? 'increase' : 'decrease';
+                        $insAdj = $pdo->prepare("INSERT INTO deposit_adjustments (deposit_id, old_amount, new_amount, difference, direction, currency, requested_by, approved_by, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+                        $insAdj->execute([
+                            $editId, $deposit['amount'], $amount, $diff, $direction, $form['currency'],
+                            currentUserId(), currentUserId(), 'تعديل مباشر من قبل الإدارة'
+                        ]);
+                    }
+                    
+                    setFlash('success', 'تم تعديل الوديعة بنجاح.');
+                    header('Location: deposits.php');
+                    exit;
+                } else {
+                    $reqId = createApprovalRequest(
+                        $pdo,
+                        'deposits.financial_change',
+                        'deposit',
+                        $editId,
+                        $payload,
+                        $deposit
+                    );
 
-                setFlash('info', 'تم تقديم طلب تعديل بيانات الوديعة رقم #' . $editId . ' (طلب موافقة رقم #' . $reqId . '). لن تتغير البيانات حتى الاعتماد.');
-                header('Location: deposits.php');
-                exit;
+                    setFlash('info', 'تم تقديم طلب تعديل بيانات الوديعة رقم #' . $editId . ' (طلب موافقة رقم #' . $reqId . '). لن تتغير البيانات حتى الاعتماد.');
+                    header('Location: deposits.php');
+                    exit;
+                }
 
             } else {
                 // CREATE NEW DEPOSIT (Initial creation transaction)

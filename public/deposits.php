@@ -306,12 +306,23 @@ include __DIR__ . '/../includes/header.php';
                                                     </div>
                                                 <?php endif; ?>
 
-                                                  <?php if (userCan('deposits.update')): ?>
+                                                  <?php endif; ?>
+                                                  <?php if (userCan('deposits.update') || currentRole() === 'admin'): ?>
                                                       <a href="deposit_add.php?edit=<?= $d['id'] ?>" class="btn btn-sm btn-outline-gold" title="تعديل الوديعة">
                                                           <i class="bi bi-pencil"></i>
                                                       </a>
                                                   <?php endif; ?>
-                                              <?php endif; ?>
+                                                  
+                                                  <?php if (currentRole() === 'admin'): ?>
+                                                      <form method="POST" class="d-inline m-0" onsubmit="return confirm('تحذير: هل أنت متأكد من حذف هذه الوديعة نهائياً؟');">
+                                                          <?= csrfField() ?>
+                                                          <input type="hidden" name="action" value="delete_deposit">
+                                                          <input type="hidden" name="deposit_id" value="<?= $d['id'] ?>">
+                                                          <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف الوديعة">
+                                                              <i class="bi bi-trash"></i>
+                                                          </button>
+                                                      </form>
+                                                  <?php endif; ?>
                                           </div>
                                     </td>
                                 </tr>
