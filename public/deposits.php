@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $pdo->prepare("DELETE FROM profit_cycles WHERE deposit_id = ?")->execute([$dId]);
         $pdo->prepare("DELETE FROM manual_profit_adjustments WHERE deposit_id = ?")->execute([$dId]);
         $pdo->prepare("DELETE FROM deposit_adjustments WHERE deposit_id = ?")->execute([$dId]);
-        $pdo->prepare("DELETE FROM approvals WHERE entity_type = 'deposit' AND entity_id = ?")->execute([$dId]);
+        $pdo->prepare("DELETE FROM approval_requests WHERE entity_type = 'deposit' AND entity_id = ?")->execute([$dId]);
         
         // Delete the deposit itself
         $pdo->prepare("DELETE FROM deposits WHERE id = ?")->execute([$dId]);
