@@ -91,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$depositId, $investorId]);
             $deposit = $stmt->fetch();
 
+            if (!isDepositProfitDue($deposit)) { throw new Exception('لا يمكن سحب الأرباح حالياً. دورة السحب لهذه الوديعة لم يحن موعدها بعد.'); }
             if (!$deposit || !in_array($deposit['status'], ['active', 'completed'], true)) {
                 throw new Exception('الوديعة المحددة غير صالحة أو غير مجهزة للسحب.');
             }
@@ -278,6 +279,7 @@ $pageTitle = 'بوابة المستثمر';
                     </thead>
                     <tbody>
                         <?php foreach ($deposits as $d):
+                                if (!isDepositProfitDue($d)) continue;
                             $pendingForDep = (float)($pendingMap[$d['id']] ?? 0);
                             $availableForDep = max(0.00, (float)$d['accumulated_profit'] - $pendingForDep);
                             ?>
@@ -315,6 +317,7 @@ $pageTitle = 'بوابة المستثمر';
                         <select name="deposit_id" class="form-select" required>
                             <option value="">— اختر الوديعة —</option>
                             <?php foreach ($deposits as $d):
+                                if (!isDepositProfitDue($d)) continue;
                                 if ((float)$d['accumulated_profit'] <= 0 || !in_array($d['status'], ['active','completed'], true)) continue;
                                 $pendingForDep = (float)($pendingMap[$d['id']] ?? 0);
                                 $availableForDep = max(0.00, (float)$d['accumulated_profit'] - $pendingForDep);
