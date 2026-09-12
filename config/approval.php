@@ -447,8 +447,12 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                 $insMpa = $pdo->prepare("INSERT INTO manual_profit_adjustments (deposit_id, amount, currency, month, reason, approval_request_id, requested_by, approved_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
                 $insMpa->execute([$depositId, $amount, $currency, $month, $reason, $requestId, $req['requested_by'], $approverId]);
 
-                $upDep = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ? WHERE id = ?");
-                $upDep->execute([$amount, $depositId]);
+                // Advance last_profit_date to the date this profit covers to avoid showing the add profit button again for the same month
+                $nextProfitDateObj = calcNextProfitDate($deposit);
+                $newLastProfitDate = $nextProfitDateObj ? $nextProfitDateObj->format('Y-m-d') : date('Y-m-d');
+
+                $upDep = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ?, last_profit_date = ? WHERE id = ?");
+                $upDep->execute([$amount, $newLastProfitDate, $depositId]);
 
                 if ($upDep->rowCount() !== 1) {
                     throw new TechnicalExecutionException('فشل تحديث رصيد الوديعة.');
