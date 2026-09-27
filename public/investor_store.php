@@ -153,7 +153,18 @@ include __DIR__ . '/../includes/header.php';
     <?php include __DIR__ . '/../includes/flash_messages.php'; ?>
     
     <?php if(isset($_GET['error']) && $_GET['error'] === 'no_balance'): ?>
-        <div class="alert alert-danger fw-bold shadow text-center"><i class="bi bi-x-circle fs-4 me-2"></i>عذراً، رصيد أرباحك الحالي لا يكفي لإتمام عملية الشراء!</div>
+        <div id="noBalanceAlert" class="alert alert-danger fw-bold shadow text-center" style="transition: opacity 0.5s ease;"><i class="bi bi-x-circle fs-4 me-2"></i>عذراً، رصيد أرباحك الحالي لا يكفي لإتمام عملية الشراء!</div>
+        <script>
+            setTimeout(function() {
+                let alertMsg = document.getElementById('noBalanceAlert');
+                if(alertMsg) {
+                    alertMsg.style.opacity = '0';
+                    setTimeout(() => alertMsg.remove(), 500);
+                    // Remove error from URL without reloading the page
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }, 4000);
+        </script>
     <?php endif; ?>
 
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -208,7 +219,11 @@ include __DIR__ . '/../includes/header.php';
                             <h6 class="fw-bold text-white mb-1"><?= htmlspecialchars($p['name_ar']) ?></h6>
                             <p class="small text-muted mb-3 flex-grow-1" style="font-size: 0.8rem;"><?= htmlspecialchars($p['description']) ?></p>
                             
-                            <div class="fs-5 fw-bold text-gold mb-3"><?= formatMoney($p['price'], $p['currency']) ?></div>
+                            <div class="mb-3 mt-2">
+                                <span class="d-inline-block px-4 py-2 rounded-pill fw-bold" style="background: linear-gradient(145deg, rgba(212,175,55,0.15) 0%, rgba(212,175,55,0.05) 100%); border: 1px solid rgba(212,175,55,0.5); color: var(--gold); font-size: 1.15rem; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                                    <?= formatMoney($p['price'], $p['currency']) ?>
+                                </span>
+                            </div>
                             <button class="btn btn-sm btn-gold w-100 mt-auto fw-bold" data-bs-toggle="modal" data-bs-target="#buyModal<?= $p['id'] ?>">شراء الآن</button>
                         </div>
                     </div>
