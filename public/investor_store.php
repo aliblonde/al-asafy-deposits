@@ -198,7 +198,13 @@ $pageTitle = 'المتجر الرقمي';
                         <?php foreach ($section['products'] as $p): ?>
                         <div class="col-6 col-md-4 col-lg-3">
                             <div class="product-card p-3 text-center d-flex flex-column">
-                                <i class="bi <?= $section['cat']['icon'] ?> cat-icon"></i>
+                                <?php if (!empty($p['image_url'])): ?>
+    <div class="mb-3 d-flex align-items-center justify-content-center" style="height: 100px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px;">
+        <img src="<?= htmlspecialchars($p['image_url']) ?>" alt="Logo" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+    </div>
+<?php else: ?>
+    <i class="bi <?= $section['cat']['icon'] ?> cat-icon"></i>
+<?php endif; ?>
                                 <h6 class="fw-bold mb-1"><?= htmlspecialchars($p['name_ar']) ?></h6>
                                 <p class="small text-muted mb-3 flex-grow-1"><?= htmlspecialchars($p['description']) ?></p>
                                 <div class="fs-5 fw-bold text-gold mb-3"><?= formatMoney($p['price'], $p['currency']) ?></div>
