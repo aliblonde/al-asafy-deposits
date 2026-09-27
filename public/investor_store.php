@@ -1,10 +1,21 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/csrf.php';
 
-$investorId = currentUserId();
+$userRole = currentRole();
+$investorId = currentInvestorId();
+
+// Admin impersonation override
+if (isset($_GET['as_investor_id']) && userCan('investors.impersonate')) {
+    $investorId = (int)$_GET['as_investor_id'];
+}
+
+if (!$investorId) {
+    die("<div style='padding:50px;text-align:center;color:white;'>عذراً، هذا الحساب غير مرتبط بمستثمر.</div>");
+}
+
 $pdo = getPDO();
 
 // Get active deposits and calculate total available profit
