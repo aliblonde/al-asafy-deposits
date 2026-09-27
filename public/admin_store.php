@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/rbac.php';
@@ -39,6 +39,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                             VALUES (?, ?, ?, 'service_purchase', 'debit', ?, ?, NOW(), ?)");
                     $insTx->execute([generateReceiptNo($pdo), $order['investor_id'], $order['dep_id'], $order['amount_deducted'], $order['currency'], 'شراء بطاقة: ' . $order['product_name']]);
                     
+                    // Notify Investor & Telegram
+                    require_once __DIR__ . '/../config/notifications.php';
+                    notifyInvestor($pdo, (int)$order['investor_id'], 'استلام بطاقة المتجر', "تم تنفيذ طلبك وتسليم كود بطاقة: {$order['product_name']}. ادخل لقسم (مشترياتي) لرؤية الكود.", 'investor_store.php');
+                    
+                    $invNameStmt = $pdo->prepare("SELECT full_name FROM investors WHERE id = ?");
+                    $invNameStmt->execute([$order['investor_id']]);
+                    $invName = $invNameStmt->fetchColumn() ?: 'مستثمر';
+                    sendTelegramAlert("✅ <b>تم تسليم البطاقة</b>\nالمستثمر: {$invName}\nالبطاقة: {$order['product_name']}\nتم التسليم بواسطة الإدارة.");
+
                     setFlash('success', 'تم تنفيذ الطلب وإرسال الكود للمستثمر.');
                 } elseif ($action === 'reject') {
                     $reason = trim($_POST['admin_note'] ?? '');
@@ -51,6 +60,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $refund = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ? WHERE investor_id = ? AND status = 'active' LIMIT 1");
                     $refund->execute([$order['amount_deducted'], $order['investor_id']]);
                     
+                    // Notify Investor & Telegram
+                    require_once __DIR__ . '/../config/notifications.php';
+                    notifyInvestor($pdo, (int)$order['investor_id'], 'إلغاء طلب المتجر', "تم إلغاء طلبك لبطاقة: {$order['product_name']} واسترجاع الرصيد. السبب: {$reason}", 'investor_store.php');
+                    
+                    $invNameStmt = $pdo->prepare("SELECT full_name FROM investors WHERE id = ?");
+                    $invNameStmt->execute([$order['investor_id']]);
+                    $invName = $invNameStmt->fetchColumn() ?: 'مستثمر';
+                    sendTelegramAlert("❌ <b>تم إلغاء طلب متجر</b>\nالمستثمر: {$invName}\nالبطاقة: {$order['product_name']}\nالسبب: {$reason}");
+
                     setFlash('warning', 'تم رفض الطلب وإعادة المبلغ لحساب المستثمر.');
                 }
                 

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/helpers.php';
@@ -85,6 +85,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $insOrd->execute([$investorId, $productId, $price, $curr]);
                     
                     $pdo->commit();
+
+                    // 1. Notify Investor
+                    require_once __DIR__ . '/../config/notifications.php';
+                    notifyInvestor($pdo, $investorId, 'طلب شراء من المتجر', "تم استلام طلبك لشراء: {$product['name_ar']}. وهو قيد المعالجة الآن.", 'investor_store.php');
+                    
+                    // 2. Notify Telegram Group
+                    $invNameStmt = $pdo->prepare("SELECT full_name FROM investors WHERE id = ?");
+                    $invNameStmt->execute([$investorId]);
+                    $invName = $invNameStmt->fetchColumn() ?: 'مستثمر';
+                    
+                    $tgMessage = "🛒 <b>طلب شراء جديد من المتجر!</b>\n";
+                    $tgMessage .= "👤 المستثمر: " . htmlspecialchars($invName) . "\n";
+                    $tgMessage .= "🎟️ البطاقة: " . htmlspecialchars($product['name_ar']) . "\n";
+                    $tgMessage .= "💵 المبلغ المخصوم: " . formatMoney($price, $curr) . "\n";
+                    $tgMessage .= "يرجى الدخول للوحة الإدارة لتسليم الكود.";
+                    sendTelegramAlert($tgMessage);
+                    
+                    // 3. Notify Admins in-app
+                    $admins = $pdo->query("SELECT id FROM users WHERE role IN ('admin', 'superadmin')")->fetchAll();
+                    foreach ($admins as $ad) {
+                        sendNotification($pdo, $ad['id'], 'طلب متجر جديد', "طلب المستثمر {$invName} بطاقة {$product['name_ar']}", 'admin_store.php');
+                    }
+
                     setFlash('success', 'تم استلام طلبك بنجاح! سيتم إرسال كود البطاقة لك قريباً في قسم (مشترياتي).');
                 } catch (Exception $e) {
                     $pdo->rollBack();
