@@ -69,7 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($curr === 'IQD' && $availableProfitIQD >= $price) $hasEnough = true;
             
             if (!$hasEnough) {
+                // Use both flash and explicit URL parameter to guarantee it shows
                 setFlash('danger', 'عذراً، رصيد أرباحك (' . currencySymbol($curr) . ') لا يكفي لشراء هذه البطاقة.');
+                header('Location: investor_store.php?error=no_balance');
+                exit;
             } else {
                 try {
                     $pdo->beginTransaction();
@@ -107,9 +110,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
 
                     setFlash('success', 'تم استلام طلبك بنجاح! سيتم إرسال كود البطاقة لك قريباً في قسم (مشترياتي).');
+                    header('Location: investor_store.php?success=1');
+                    exit;
                 } catch (Exception $e) {
                     $pdo->rollBack();
                     setFlash('danger', $e->getMessage());
+                    header('Location: investor_store.php?error=tech');
+                    exit;
                 }
             }
         }
@@ -144,6 +151,10 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="container-fluid py-4">
     <?php include __DIR__ . '/../includes/flash_messages.php'; ?>
+    
+    <?php if(isset($_GET['error']) && $_GET['error'] === 'no_balance'): ?>
+        <div class="alert alert-danger fw-bold shadow text-center"><i class="bi bi-x-circle fs-4 me-2"></i>عذراً، رصيد أرباحك الحالي لا يكفي لإتمام عملية الشراء!</div>
+    <?php endif; ?>
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="mb-0 text-white"><i class="bi bi-shop me-2 text-gold"></i>متجر العسافي الرقمي</h4>
