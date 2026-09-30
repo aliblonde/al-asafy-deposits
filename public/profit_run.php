@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // public/profit_run.php — Submit Profit Payout Approval Request
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
@@ -31,10 +31,8 @@ if ($depositId) {
         exit;
     }
 
-    if (!isDepositProfitDue($targetDeposit)) {
-        $nextW = calcNextWithdrawalDate($targetDeposit);
-        $nextWStr = $nextW ? $nextW->format('Y-m-d') : '';
-        setFlash('warning', 'عفواً، لا يجوز طلب صرف أرباح هذه الوديعة قبل حلول موعد استحقاق دوريتها القادمة بتاريخ: ' . formatDate($nextWStr));
+    if ((float)$targetDeposit['accumulated_profit'] <= 0) {
+        setFlash('warning', 'عذراً، لا توجد أرباح متراكمة متاحة للصرف في هذه الوديعة حالياً.');
         header('Location: deposits.php');
         exit;
     }
@@ -62,13 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'عفواً، المبلغ المطلوب أكبر من رصيد الأرباح المتراكمة المتاح بالوديعة (' . formatMoney($accumulated, $targetDeposit['currency']) . ').';
     }
 
-    $today = date('Y-m-d');
-    $nextWithdrawal = calcNextWithdrawalDate($targetDeposit);
-    $dueStr = $nextWithdrawal ? $nextWithdrawal->format('Y-m-d') : null;
-
-    if (!$dueStr || $dueStr > $today) {
-        $errors[] = 'عفواً، لا يجوز طلب صرف الأرباح للوديعة قبل موعد استحقاقها القادم بتاريخ: ' . formatDate($dueStr);
-    }
+    // No date restriction — disbursement is allowed anytime there is accumulated profit > 0
 
     if (empty($errors)) {
         try {
