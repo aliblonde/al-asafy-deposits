@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // public/deposits.php — Deposits Dashboard & Close Approval Submission
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
@@ -285,7 +285,7 @@ include __DIR__ . '/../includes/header.php';
                                     <td>
                                           <div class="d-flex flex-wrap gap-1 align-items-center">
                                               <?php if ($d['status'] === 'active'): ?>
-                                                  <?php if ($isDue && userCan('profits.request_payout')): ?>
+                                                  <?php if ($hasProfit && userCan('profits.request_payout')): ?>
                                                       <a href="profit_run.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-gold fw-bold px-3" title="طلب صرف الأرباح">
                                                           <i class="bi bi-wallet2 me-1"></i> طلب صرف
                                                       </a>
