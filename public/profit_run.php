@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
 
         } catch (Throwable $e) {
-            $errors[] = getSafeErrorMessage($e, 'حدث خطأ أثناء إرسال طلب صرف الأرباح.');
+            $errors[] = 'خطأ تقني (DEBUG): ' . $e->getMessage() . ' | File: ' . $e->getFile() . ':' . $e->getLine();
         }
     }
 }
