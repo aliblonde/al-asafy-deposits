@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // public/profit_run.php — Submit Profit Payout Approval Request
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
