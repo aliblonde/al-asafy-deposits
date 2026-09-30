@@ -253,9 +253,7 @@ function executeApprovalRequest(PDO $pdo, int $requestId, int $approverId): arra
                     throw new BusinessRuleException('الوديعة غير نشطة أو غير موجودة.');
                 }
 
-                if (!isDepositProfitDue($deposit)) {
-                    throw new BusinessRuleException('الأرباح لهذه الوديعة ليست مستحقة للصرف حالياً.');
-                }
+                // Disbursement allowed anytime accumulated_profit > 0 (no date restriction)
 
                 $accumulated = (float)$deposit['accumulated_profit'];
                 if ($amount > $accumulated) {
