@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // public/deposits.php — Deposits Dashboard & Close Approval Submission
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
@@ -291,8 +291,8 @@ include __DIR__ . '/../includes/header.php';
                                                       </a>
                                                   <?php endif; ?>
 
-                                                  <?php if ((int)$d['profit_payout_frequency'] > 1 && $isMonthlyProfitDue && userCan('profits.request_manual')): ?>
-                                                      <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success" title="طلب إضافة ربح شهري تراكمي">
+                                                  <?php if (userCan('profits.request_manual')): ?>
+                                                        <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success" title="طلب إضافة ربح شهري تراكمي">
                                                           <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
                                                       </a>
                                                   <?php endif; ?>
