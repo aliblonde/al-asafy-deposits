@@ -102,12 +102,17 @@ function createApprovalRequest(
     $idempotencyKey = hash('sha256', $operationType . ':' . $entityType . ':' . ($entityId ?: '0') . ':' . $requestedBy . ':' . $canonicalJson);
 
     // Only return existing if PENDING (Section 7)
-    $chkStmt = $pdo->prepare("SELECT id FROM approval_requests WHERE idempotency_key = ? AND status = 'pending' LIMIT 1");
+    $chkStmt = $pdo->prepare("SELECT id, status FROM approval_requests WHERE idempotency_key = ? LIMIT 1");
     $chkStmt->execute([$idempotencyKey]);
-    $existingId = $chkStmt->fetchColumn();
+    $existing = $chkStmt->fetch();
 
-    if ($existingId) {
-        return (int)$existingId;
+    if ($existing) {
+        if ($existing['status'] === 'pending') {
+            return (int)$existing['id'];
+        }
+        // If rejected/failed, delete old record to allow re-submission
+        $delStmt = $pdo->prepare("DELETE FROM approval_requests WHERE id = ?");
+        $delStmt->execute([$existing['id']]);
     }
 
     try {
