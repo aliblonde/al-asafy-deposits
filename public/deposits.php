@@ -291,7 +291,7 @@ include __DIR__ . '/../includes/header.php';
                                                       </a>
                                                   <?php endif; ?>
 
-                                                  <?php if (($isDue || $isMonthlyProfitDue) && userCan('profits.request_manual')): ?>
+                                                  <?php if ($isMonthlyProfitDue && userCan('profits.request_manual')): ?>
                                                         <a href="deposit_add_profit.php?deposit_id=<?= $d['id'] ?>" class="btn btn-sm btn-outline-success" title="طلب إضافة ربح شهري تراكمي">
                                                           <i class="bi bi-plus-circle me-1"></i> ربح تراكمي
                                                       </a>
