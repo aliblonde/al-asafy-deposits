@@ -155,10 +155,29 @@ function createApprovalRequest(
         }
         
         $msg = "🔔 <b>طلب اعتماد مالي جديد!</b>\n";
-        $msg .= "الطلب: <b>$operationName</b>\n";
+        $msg .= "النوع: <b>$operationName</b>\n";
         $msg .= "رقم الكيان: <code>$entityId</code>\n";
+
+        // Add amount if present in payload
+        if (!empty($canonicalPayload['amount'])) {
+            $currency = $canonicalPayload['currency'] ?? ($canonicalPayload['disburse_currency'] ?? 'IQD');
+            $msg .= "المبلغ: <b>" . number_format((float)$canonicalPayload['amount'], 2) . " $currency</b>\n";
+        }
+        // Withdrawal-specific amount field
+        if (!empty($canonicalPayload['requested_amount'])) {
+            $currency = $canonicalPayload['currency'] ?? 'IQD';
+            $msg .= "المبلغ المطلوب: <b>" . number_format((float)$canonicalPayload['requested_amount'], 2) . " $currency</b>\n";
+        }
+        // Add note/reason if present
+        if (!empty($canonicalPayload['note'])) {
+            $msg .= "الملاحظة: " . mb_substr($canonicalPayload['note'], 0, 100) . "\n";
+        }
+        if (!empty($canonicalPayload['reason'])) {
+            $msg .= "السبب: " . mb_substr($canonicalPayload['reason'], 0, 100) . "\n";
+        }
+
         $msg .= "بواسطة: $username\n\n";
-        $msg .= "يرجى الدخول للنظام لمراجعته.";
+        $msg .= "يرجى الدخول للنظام لمراجعته واعتماده.";
         sendTelegramAlert($msg);
 
         return $reqId;

@@ -113,6 +113,7 @@ include __DIR__ . '/../includes/header.php';
                                 <th>#</th>
                                 <th>نوع العملية</th>
                                 <th>الكيان المستهدف</th>
+                                <th>المبلغ</th>
                                 <th>طالب العملية</th>
                                 <th>تاريخ الطلب</th>
                                 <th>الحالة</th>
@@ -124,10 +125,22 @@ include __DIR__ . '/../includes/header.php';
                                 $requiredPerm = getRequiredApprovalPermission($r['operation_type']);
                                 $canApproveThis = userCan($requiredPerm);
                                 ?>
+                                <?php
+                                    $pl = json_decode($r['payload_json'] ?? '{}', true) ?: [];
+                                    $rowAmount = $pl['amount'] ?? $pl['requested_amount'] ?? $pl['disburse_amount'] ?? null;
+                                    $rowCurrency = $pl['currency'] ?? $pl['disburse_currency'] ?? '';
+                                ?>
                                 <tr>
                                     <td><?= $r['id'] ?></td>
                                     <td><span class="badge bg-primary"><?= arabicOperationType($r['operation_type']) ?></span></td>
                                     <td><?= htmlspecialchars($r['entity_type']) ?> #<?= $r['entity_id'] ?: '—' ?></td>
+                                    <td>
+                                        <?php if ($rowAmount !== null): ?>
+                                            <span class="fw-bold text-gold"><?= number_format((float)$rowAmount, 2) ?> <?= htmlspecialchars($rowCurrency) ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="fw-bold"><?= htmlspecialchars($r['requester_name'] ?: 'مستثمر / نظام') ?></td>
                                     <td><?= formatDate($r['created_at']) ?></td>
                                     <td><span class="badge <?= statusBadge($r['status']) ?>"><?= arabicStatus($r['status']) ?></span></td>
