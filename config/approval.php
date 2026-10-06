@@ -96,6 +96,34 @@ function createApprovalRequest(
     ?array $oldData = null
 ): int {
     $requestedBy = currentUserId();
+
+    // Auto-enrich payload for withdraw_request if amount is missing
+    $investorInfo = '';
+    if (in_array($entityType, ['withdraw_request', 'withdraw_requests']) && $entityId) {
+        $wrStmt = $pdo->prepare("
+            SELECT wr.amount, wr.currency, wr.note, i.full_name
+            FROM withdraw_requests wr
+            LEFT JOIN investors i ON i.id = wr.investor_id
+            WHERE wr.id = ?
+        ");
+        $wrStmt->execute([$entityId]);
+        $wrData = $wrStmt->fetch(PDO::FETCH_ASSOC);
+        if ($wrData) {
+            if (empty($payload['amount'])) {
+                $payload['amount'] = (float)$wrData['amount'];
+            }
+            if (empty($payload['currency'])) {
+                $payload['currency'] = $wrData['currency'] ?? 'IQD';
+            }
+            if (empty($payload['note']) && !empty($wrData['note'])) {
+                $payload['note'] = $wrData['note'];
+            }
+            if (!empty($wrData['full_name'])) {
+                $investorInfo = $wrData['full_name'];
+            }
+        }
+    }
+
     $canonicalPayload = canonicalizePayload($payload);
     $canonicalJson = json_encode($canonicalPayload, JSON_UNESCAPED_UNICODE);
 
@@ -156,7 +184,10 @@ function createApprovalRequest(
         
         $msg = "🔔 <b>طلب اعتماد مالي جديد!</b>\n";
         $msg .= "النوع: <b>$operationName</b>\n";
-        $msg .= "رقم الكيان: <code>$entityId</code>\n";
+        $msg .= "رقم الكيان: <code>#$entityId</code>\n";
+        if (!empty($investorInfo)) {
+            $msg .= "المستثمر: <b>$investorInfo</b>\n";
+        }
 
         // Add amount if present in payload
         if (!empty($canonicalPayload['amount'])) {
@@ -167,6 +198,11 @@ function createApprovalRequest(
         if (!empty($canonicalPayload['requested_amount'])) {
             $currency = $canonicalPayload['currency'] ?? 'IQD';
             $msg .= "المبلغ المطلوب: <b>" . number_format((float)$canonicalPayload['requested_amount'], 2) . " $currency</b>\n";
+        }
+        // Deposit financial change
+        if (!empty($canonicalPayload['new_amount'])) {
+            $currency = $canonicalPayload['new_currency'] ?? 'IQD';
+            $msg .= "المبلغ المعدل: <b>" . number_format((float)$canonicalPayload['new_amount'], 2) . " $currency</b>\n";
         }
         // Add note/reason if present
         if (!empty($canonicalPayload['note'])) {

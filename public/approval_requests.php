@@ -127,8 +127,23 @@ include __DIR__ . '/../includes/header.php';
                                 ?>
                                 <?php
                                     $pl = json_decode($r['payload_json'] ?? '{}', true) ?: [];
-                                    $rowAmount = $pl['amount'] ?? $pl['requested_amount'] ?? $pl['disburse_amount'] ?? null;
-                                    $rowCurrency = $pl['currency'] ?? $pl['disburse_currency'] ?? '';
+                                    $rowAmount = $pl['amount'] ?? $pl['requested_amount'] ?? $pl['disburse_amount'] ?? $pl['new_amount'] ?? null;
+                                    $rowCurrency = $pl['currency'] ?? $pl['disburse_currency'] ?? $pl['new_currency'] ?? '';
+
+                                    // Fallback for withdraw_request if amount was not in payload_json (e.g. existing records)
+                                    if ($rowAmount === null && in_array($r['entity_type'], ['withdraw_request', 'withdraw_requests']) && !empty($r['entity_id'])) {
+                                        static $wrCache = [];
+                                        $eId = (int)$r['entity_id'];
+                                        if (!isset($wrCache[$eId])) {
+                                            $stmtWr = $pdo->prepare("SELECT amount, currency FROM withdraw_requests WHERE id = ?");
+                                            $stmtWr->execute([$eId]);
+                                            $wrCache[$eId] = $stmtWr->fetch(PDO::FETCH_ASSOC);
+                                        }
+                                        if (!empty($wrCache[$eId])) {
+                                            $rowAmount = $wrCache[$eId]['amount'];
+                                            $rowCurrency = $wrCache[$eId]['currency'] ?? 'IQD';
+                                        }
+                                    }
                                 ?>
                                 <tr>
                                     <td><?= $r['id'] ?></td>

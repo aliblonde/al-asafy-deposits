@@ -125,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'withdraw_request',
                 $wReqId,
                 [
-                    'withdraw_request_id' => $wReqId
+                    'withdraw_request_id' => $wReqId, 'amount' => $amount, 'currency' => $currency, 'deposit_id' => $depositId, 'note' => $note
                 ]
             );
 
