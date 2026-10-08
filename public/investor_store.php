@@ -32,19 +32,12 @@ foreach ($deposits as $d) {
     else $availableProfitIQD += (float)$d['accumulated_profit'];
 }
 
-// Subtract pending withdraws & orders
+// Subtract pending withdraws (store orders are already deducted from deposits at purchase time)
 $pStmt = $pdo->prepare("SELECT currency, COALESCE(SUM(amount), 0) AS pending_total FROM withdraw_requests WHERE investor_id = ? AND status = 'pending' GROUP BY currency");
 $pStmt->execute([$investorId]);
 while ($r = $pStmt->fetch()) {
     if ($r['currency'] === 'USD') $availableProfitUSD -= (float)$r['pending_total'];
     else $availableProfitIQD -= (float)$r['pending_total'];
-}
-
-$soStmt = $pdo->prepare("SELECT currency, COALESCE(SUM(amount_deducted), 0) AS pending_store FROM store_orders WHERE investor_id = ? AND status = 'pending' GROUP BY currency");
-$soStmt->execute([$investorId]);
-while ($r = $soStmt->fetch()) {
-    if ($r['currency'] === 'USD') $availableProfitUSD -= (float)$r['pending_store'];
-    else $availableProfitIQD -= (float)$r['pending_store'];
 }
 
 $availableProfitUSD = max(0, $availableProfitUSD);

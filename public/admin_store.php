@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/rbac.php';
@@ -14,10 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     if ($orderId) {
-        $stmt = $pdo->prepare("SELECT o.*, p.name_ar as product_name, d.id as dep_id, d.investor_id 
+        $stmt = $pdo->prepare("SELECT o.*, p.name_ar as product_name 
                                FROM store_orders o 
                                JOIN store_products p ON p.id = o.product_id 
-                               JOIN (SELECT id, investor_id FROM deposits LIMIT 1) d ON d.investor_id = o.investor_id 
                                WHERE o.id = ? AND o.status = 'pending'");
         $stmt->execute([$orderId]);
         $order = $stmt->fetch();
@@ -27,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->beginTransaction();
                 
                 if ($action === 'approve') {
-                    $pinCode = $_POST['pin_code'] ?? '';
+                    $pinCode = trim($_POST['pin_code'] ?? '');
                     if (empty($pinCode)) throw new Exception("يجب إدخال الرقم السري للبطاقة.");
                     
                     $upd = $pdo->prepare("UPDATE store_orders SET status = 'completed', pin_code = ?, processed_at = NOW(), processed_by = ? WHERE id = ?");
@@ -39,15 +38,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     setFlash('success', 'تم تسليم البطاقة للمستثمر بنجاح.');
                     
                 } elseif ($action === 'reject') {
-                    // Refund
-                    $updDep = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ? WHERE id = ?");
-                    $updDep->execute([$order['amount_deducted'], $order['dep_id']]);
+                    // Find active deposit for this investor in matching currency to refund
+                    $depStmt = $pdo->prepare("SELECT id FROM deposits WHERE investor_id = ? AND currency = ? AND status = 'active' ORDER BY id ASC LIMIT 1");
+                    $depStmt->execute([$order['investor_id'], $order['currency']]);
+                    $depId = $depStmt->fetchColumn();
                     
+                    if (!$depId) {
+                        $depStmt = $pdo->prepare("SELECT id FROM deposits WHERE investor_id = ? AND status = 'active' ORDER BY id ASC LIMIT 1");
+                        $depStmt->execute([$order['investor_id']]);
+                        $depId = $depStmt->fetchColumn();
+                    }
+                    if (!$depId) {
+                        $depStmt = $pdo->prepare("SELECT id FROM deposits WHERE investor_id = ? ORDER BY id DESC LIMIT 1");
+                        $depStmt->execute([$order['investor_id']]);
+                        $depId = $depStmt->fetchColumn();
+                    }
+                    
+                    if ($depId) {
+                        $updDep = $pdo->prepare("UPDATE deposits SET accumulated_profit = accumulated_profit + ? WHERE id = ?");
+                        $updDep->execute([$order['amount_deducted'], $depId]);
+                    }
+                    
+                    $adminNote = trim($_POST['admin_note'] ?? '');
+                    $noteStr = $adminNote ?: 'مرفوض';
                     $updOrd = $pdo->prepare("UPDATE store_orders SET status = 'rejected', admin_note = ?, processed_at = NOW(), processed_by = ? WHERE id = ?");
-                    $updOrd->execute([$_POST['admin_note'] ?? 'مرفوض', currentUserId(), $orderId]);
+                    $updOrd->execute([$noteStr, currentUserId(), $orderId]);
                     
                     require_once __DIR__ . '/../config/notifications.php';
-                    notifyInvestor($pdo, $order['investor_id'], 'تم رفض طلب المتجر', "تم رفض طلب بطاقة {$order['product_name']}. السبب: " . ($_POST['admin_note'] ?? 'مرفوض'), 'investor_store.php');
+                    notifyInvestor($pdo, $order['investor_id'], 'تم رفض طلب المتجر واسترجاع المبلغ', "تم رفض طلب بطاقة {$order['product_name']}. تم إرجاع مبلغ " . formatMoney($order['amount_deducted'], $order['currency']) . " إلى رصيد أرباحك. السبب: {$noteStr}", 'investor_store.php');
                     
                     setFlash('success', 'تم رفض الطلب وإرجاع المبلغ للمستثمر بنجاح.');
                 }
@@ -57,6 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->rollBack();
                 setFlash('danger', $e->getMessage());
             }
+        } else {
+            setFlash('danger', 'لم يتم العثور على الطلب أو تمت معالجته مسبقاً.');
         }
     }
     header('Location: admin_store.php');
