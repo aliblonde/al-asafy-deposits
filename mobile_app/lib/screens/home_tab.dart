@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../constants/theme.dart';
 import '../services/api_service.dart';
 import 'withdraw_dialog.dart';
+import 'notifications_sheet.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -55,6 +56,18 @@ class _HomeTabState extends State<HomeTab> {
       appBar: AppBar(
         title: const Text('لوحة الحساب الاستثماري'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'مركز الإشعارات والتنبيهات',
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => const NotificationsSheet(),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _fetchDashboard,

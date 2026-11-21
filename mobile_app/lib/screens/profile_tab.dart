@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 import '../constants/theme.dart';
 import '../services/api_service.dart';
 import 'login_screen.dart';
@@ -12,16 +13,61 @@ class ProfileTab extends StatefulWidget {
 
 class _ProfileTabState extends State<ProfileTab> {
   Map<String, dynamic>? _investor;
+  bool _biometricsEnabled = false;
 
   @override
   void initState() {
     super.initState();
     _loadInvestor();
+    _loadBiometricsStatus();
   }
 
   void _loadInvestor() async {
     final data = await ApiService.getInvestorData();
-    setState(() => _investor = data);
+    if (mounted) setState(() => _investor = data);
+  }
+
+  void _loadBiometricsStatus() async {
+    final enabled = await ApiService.isBiometricsEnabled();
+    if (mounted) setState(() => _biometricsEnabled = enabled);
+  }
+
+  void _toggleBiometrics(bool value) async {
+    if (value) {
+      final localAuth = LocalAuthentication();
+      try {
+        final canCheck = await localAuth.canCheckBiometrics || await localAuth.isDeviceSupported();
+        if (!canCheck) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('جهازك لا يدعم المصادقة بالبصمة'), backgroundColor: AppTheme.danger),
+          );
+          return;
+        }
+
+        final authenticated = await localAuth.authenticate(
+          localizedReason: 'يرجى تأكيد البصمة لتفعيل تسجيل الدخول السريع',
+          options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
+        );
+
+        if (authenticated) {
+          await ApiService.setBiometricsEnabled(true);
+          if (!mounted) return;
+          setState(() => _biometricsEnabled = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم تفعيل الدخول بالبصمة بنجاح'), backgroundColor: AppTheme.success),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر التحقق من البصمة'), backgroundColor: AppTheme.danger),
+        );
+      }
+    } else {
+      await ApiService.setBiometricsEnabled(false);
+      if (mounted) setState(() => _biometricsEnabled = false);
+    }
   }
 
   void _handleLogout() async {
@@ -119,10 +165,11 @@ class _ProfileTabState extends State<ProfileTab> {
                       setDlgState(() => isSaving = false);
                       if (!mounted) return;
 
+                      Navigator.of(ctx).pop();
+
                       if (res['success'] == true) {
-                        Navigator.of(ctx).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(res['message']), backgroundColor: AppTheme.success),
+                          SnackBar(content: Text(res['message'] ?? 'تم تغيير كلمة المرور بنجاح'), backgroundColor: AppTheme.success),
                         );
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -130,7 +177,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         );
                       }
                     },
-              child: isSaving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('حفظ'),
+              child: isSaving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('حفظ التغييرات'),
             ),
           ],
         ),
@@ -138,7 +185,7 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  // Store Compliance: In-App Account Deletion Dialog (Apple 5.1.1 & Google Play)
+  // Delete Account Dialog
   void _showDeleteAccountDialog() {
     final passController = TextEditingController();
     final reasonController = TextEditingController();
@@ -154,7 +201,7 @@ class _ProfileTabState extends State<ProfileTab> {
             children: [
               Icon(Icons.warning_amber_rounded, color: AppTheme.danger),
               SizedBox(width: 8),
-              Text('طلب حذف الحساب', style: TextStyle(color: AppTheme.danger, fontSize: 18)),
+              Text('طلب إغلاق وحذف الحساب', style: TextStyle(color: AppTheme.danger, fontSize: 16)),
             ],
           ),
           content: Form(
@@ -165,15 +212,15 @@ class _ProfileTabState extends State<ProfileTab> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'تنبيه: سيؤدي هذا الإجراء إلى تسجيل طلب إغلاق الحساب وإنهاء صلاحيات الوصول للتطبيق.',
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                    'تنبيه: سيتم إرسال طلب إغلاق الحساب إلى الإدارة للتدقيق وتصفية أي ودائع مستحقة.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textMuted, height: 1.5),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: passController,
                     obscureText: true,
-                    decoration: const InputDecoration(labelText: 'كلمة المرور الحالية للتأكيد'),
-                    validator: (v) => (v == null || v.isEmpty) ? 'يرجى إدخال كلمة المرور' : null,
+                    decoration: const InputDecoration(labelText: 'أدخل كلمة المرور لتأكيد الطلب'),
+                    validator: (v) => (v == null || v.isEmpty) ? 'كلمة المرور مطلوبة' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -259,7 +306,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   children: [
                     CircleAvatar(
                       radius: 36,
-                      backgroundColor: AppTheme.gold.withOpacity(0.2),
+                      backgroundColor: AppTheme.gold.withValues(alpha: 0.2),
                       child: const Icon(Icons.person, color: AppTheme.gold, size: 40),
                     ),
                     const SizedBox(height: 12),
@@ -285,9 +332,55 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // Actions Menu
+            // Settings & Preferences Card
+            Card(
+              child: Column(
+                children: [
+                  // Dark / Light Theme Toggle
+                  ValueListenableBuilder<ThemeMode>(
+                    valueListenable: AppTheme.themeModeNotifier,
+                    builder: (ctx, mode, _) {
+                      final isDark = mode == ThemeMode.dark;
+                      return SwitchListTile(
+                        secondary: Icon(isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined, color: AppTheme.gold),
+                        title: const Text('المظهر الليلي (Dark Mode)'),
+                        subtitle: Text(isDark ? 'المظهر الليلي الفاخر مفعل' : 'المظهر النهاري مفعل', style: const TextStyle(fontSize: 11)),
+                        value: isDark,
+                        activeColor: AppTheme.gold,
+                        onChanged: (_) => AppTheme.toggleTheme(),
+                      );
+                    },
+                  ),
+                  const Divider(color: AppTheme.borderGold, height: 1),
+
+                  // Biometrics Toggle
+                  SwitchListTile(
+                    secondary: const Icon(Icons.fingerprint, color: AppTheme.gold),
+                    title: const Text('الدخول بالبصمة (Face ID / بصمة الإصبع)'),
+                    subtitle: Text(_biometricsEnabled ? 'الدخول السريع مفعل' : 'غير مفعل', style: const TextStyle(fontSize: 11)),
+                    value: _biometricsEnabled,
+                    activeColor: AppTheme.gold,
+                    onChanged: _toggleBiometrics,
+                  ),
+                  const Divider(color: AppTheme.borderGold, height: 1),
+
+                  // WhatsApp Direct Support
+                  ListTile(
+                    leading: const Icon(Icons.support_agent, color: Color(0xFF25D366)),
+                    title: const Text('خدمة العملاء والدعم الفني (واتساب)'),
+                    subtitle: const Text('07731111861 — رد مباشر ومساعدتك في حسابك', style: TextStyle(fontSize: 11)),
+                    trailing: const Icon(Icons.chevron_left, color: AppTheme.textMuted),
+                    onTap: ApiService.openWhatsAppSupport,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Account Security & Legal Card
             Card(
               child: Column(
                 children: [
@@ -350,7 +443,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
             const SizedBox(height: 20),
             const Text(
-              'الإصدار 1.0.0 (Build 1) — مجموعة العسافي للاستثمارات',
+              'الإصدار 1.0.0 — مجموعة العسافي للاستثمارات',
               style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
             ),
           ],

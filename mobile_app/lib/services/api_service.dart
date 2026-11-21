@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ApiService {
   // Live Production Server URL
@@ -8,6 +9,10 @@ class ApiService {
 
   static const String _tokenKey = 'auth_jwt_token';
   static const String _investorKey = 'cached_investor_data';
+
+  static const String _bioEnabledKey = 'bio_auth_enabled';
+  static const String _bioUsernameKey = 'bio_username';
+  static const String _bioPasswordKey = 'bio_password';
 
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -35,6 +40,46 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_investorKey);
+  }
+
+  // Biometrics Helper
+  static Future<bool> isBiometricsEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_bioEnabledKey) ?? false;
+  }
+
+  static Future<void> setBiometricsEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_bioEnabledKey, enabled);
+    if (!enabled) {
+      await prefs.remove(_bioUsernameKey);
+      await prefs.remove(_bioPasswordKey);
+    }
+  }
+
+  static Future<void> saveBiometricCredentials(String username, String password) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_bioUsernameKey, username);
+    await prefs.setString(_bioPasswordKey, password);
+  }
+
+  static Future<Map<String, String>?> getBiometricCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final u = prefs.getString(_bioUsernameKey);
+    final p = prefs.getString(_bioPasswordKey);
+    if (u != null && p != null && u.isNotEmpty && p.isNotEmpty) {
+      return {'username': u, 'password': p};
+    }
+    return null;
+  }
+
+  // WhatsApp Support Helper
+  static Future<bool> openWhatsAppSupport() async {
+    final uri = Uri.parse('https://wa.me/9647731111861?text=${Uri.encodeComponent("مرحباً مجموعة العسافي، أود الاستفسار بخصوص حسابي الاستثماري.")}');
+    if (await canLaunchUrl(uri)) {
+      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+    return false;
   }
 
   static Future<Map<String, String>> _getHeaders() async {
@@ -71,7 +116,7 @@ class ApiService {
     }
   }
 
-  // 2. Dashboard Overview
+  // 2. Investor Dashboard Overview
   static Future<Map<String, dynamic>> getDashboard() async {
     final url = Uri.parse('$baseUrl/dashboard.php');
     try {
@@ -80,7 +125,7 @@ class ApiService {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       return data;
     } catch (e) {
-      return {'success': false, 'message': 'فشل تحميل بيانات لوحة التحكم.'};
+      return {'success': false, 'message': 'تعذر تحميل بيانات لوحة الحساب.'};
     }
   }
 
@@ -93,7 +138,7 @@ class ApiService {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       return data;
     } catch (e) {
-      return {'success': false, 'message': 'فشل تحميل الودائع.'};
+      return {'success': false, 'message': 'تعذر تحميل قائمة الودائع.'};
     }
   }
 
@@ -122,20 +167,20 @@ class ApiService {
     }
   }
 
-  // 5. Transactions / Account Statement
-  static Future<Map<String, dynamic>> getTransactions({int page = 1, String currency = ''}) async {
-    var uri = '$baseUrl/transactions.php?page=$page';
-    if (currency.isNotEmpty) {
-      uri += '&currency=$currency';
+  // 5. Transactions Statement
+  static Future<Map<String, dynamic>> getTransactions({String? currency, int page = 1}) async {
+    var uriString = '$baseUrl/transactions.php?page=$page';
+    if (currency != null && currency.isNotEmpty) {
+      uriString += '&currency=$currency';
     }
-    final url = Uri.parse(uri);
+    final url = Uri.parse(uriString);
     try {
       final headers = await _getHeaders();
       final res = await http.get(url, headers: headers);
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       return data;
     } catch (e) {
-      return {'success': false, 'message': 'فشل تحميل كشف الحساب.'};
+      return {'success': false, 'message': 'تعذر تحميل كشف الحساب.'};
     }
   }
 
@@ -187,6 +232,49 @@ class ApiService {
       return data;
     } catch (e) {
       return {'success': false, 'message': 'فشل إرسال طلب حذف الحساب.'};
+    }
+  }
+
+  // 8. Notifications Center
+  static Future<Map<String, dynamic>> getNotifications({int limit = 30}) async {
+    final url = Uri.parse('$baseUrl/notifications.php?limit=$limit');
+    try {
+      final headers = await _getHeaders();
+      final res = await http.get(url, headers: headers);
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'تعذر تحميل الإشعارات.'};
+    }
+  }
+
+  static Future<bool> markNotificationRead(int notifId) async {
+    final url = Uri.parse('$baseUrl/notifications.php');
+    try {
+      final headers = await _getHeaders();
+      await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode({'action': 'mark_read', 'notif_id': notifId}),
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> markAllNotificationsRead() async {
+    final url = Uri.parse('$baseUrl/notifications.php');
+    try {
+      final headers = await _getHeaders();
+      await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode({'action': 'mark_all_read'}),
+      );
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 }

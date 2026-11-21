@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/theme.dart';
+import '../services/api_service.dart';
 import 'home_tab.dart';
 import 'deposits_tab.dart';
 import 'transactions_tab.dart';
@@ -26,6 +27,13 @@ class _MainNavScreenState extends State<MainNavScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _tabs[_currentIndex],
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF25D366),
+        foregroundColor: Colors.white,
+        tooltip: 'تواصل واتساب مع الدعم (07731111861)',
+        onPressed: ApiService.openWhatsAppSupport,
+        child: const Icon(Icons.chat, size: 26),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),

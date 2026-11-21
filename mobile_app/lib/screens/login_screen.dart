@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:local_auth/local_auth.dart';
 import '../constants/theme.dart';
 import '../services/api_service.dart';
 import 'main_nav_screen.dart';
@@ -16,22 +17,72 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _hasBiometrics = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    final enabled = await ApiService.isBiometricsEnabled();
+    final creds = await ApiService.getBiometricCredentials();
+    if (enabled && creds != null) {
+      if (mounted) setState(() => _hasBiometrics = true);
+      // Auto-trigger biometric prompt on startup if enabled
+      _handleBiometricLogin();
+    }
+  }
+
+  Future<void> _handleBiometricLogin() async {
+    final localAuth = LocalAuthentication();
+    try {
+      final canCheck = await localAuth.canCheckBiometrics || await localAuth.isDeviceSupported();
+      if (!canCheck) return;
+
+      final authenticated = await localAuth.authenticate(
+        localizedReason: 'تأكيد البصمة لتسجيل الدخول إلى حسابك الاستثماري',
+        options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
+      );
+
+      if (authenticated) {
+        final creds = await ApiService.getBiometricCredentials();
+        if (creds != null) {
+          setState(() => _isLoading = true);
+          final res = await ApiService.login(creds['username']!, creds['password']!);
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+          if (res['success'] == true) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const MainNavScreen()),
+            );
+          }
+        }
+      }
+    } catch (_) {}
+  }
 
   void _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
-    final res = await ApiService.login(
-      _usernameController.text.trim(),
-      _passwordController.text,
-    );
+    final u = _usernameController.text.trim();
+    final p = _passwordController.text;
+
+    final res = await ApiService.login(u, p);
 
     setState(() => _isLoading = false);
 
     if (!mounted) return;
 
     if (res['success'] == true) {
+      final bioEnabled = await ApiService.isBiometricsEnabled();
+      if (bioEnabled) {
+        await ApiService.saveBiometricCredentials(u, p);
+      }
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainNavScreen()),
       );
@@ -60,53 +111,58 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // App Brand Logo / Icon
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppTheme.gold, width: 2),
-                      gradient: const RadialGradient(
-                        colors: [AppTheme.bgCard, AppTheme.bgBase],
+                  Center(
+                    child: Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppTheme.gold, width: 2),
+                        gradient: const RadialGradient(
+                          colors: [AppTheme.bgCard, AppTheme.bgBase],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.account_balance, color: AppTheme.gold, size: 45),
                       ),
                     ),
-                    child: const Icon(
-                      Icons.account_balance,
-                      color: AppTheme.gold,
-                      size: 45,
-                    ),
                   ),
-                  const SizedBox(height: 24),
+
+                  const SizedBox(height: 20),
+
+                  // Titles
                   const Text(
-                    'العسافي للاستثمارات',
+                    'مجموعة العسافي للاستثمارات',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppTheme.gold,
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'بوابة المستثمر الإلكترونية',
+                    'بوابة المستثمر الإلكترونية الرسمية',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppTheme.textMuted,
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 40),
+
+                  const SizedBox(height: 36),
 
                   // Username
                   TextFormField(
                     controller: _usernameController,
                     decoration: const InputDecoration(
-                      labelText: 'اسم المستخدم',
+                      labelText: 'اسم المستخدم أو رقم الحساب',
                       prefixIcon: Icon(Icons.person_outline, color: AppTheme.gold),
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'يرجى إدخال اسم المستخدم' : null,
+                    validator: (v) => (v == null || v.isEmpty) ? 'يرجى إدخال اسم المستخدم' : null,
                   ),
+
                   const SizedBox(height: 18),
 
                   // Password
@@ -139,6 +195,23 @@ class _LoginScreenState extends State<LoginScreen> {
                           )
                         : const Text('تسجيل الدخول'),
                   ),
+
+                  if (_hasBiometrics) ...[
+                    const SizedBox(height: 20),
+                    Center(
+                      child: Column(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.fingerprint, size: 52, color: AppTheme.gold),
+                            tooltip: 'تسجيل الدخول بالبصمة',
+                            onPressed: _isLoading ? null : _handleBiometricLogin,
+                          ),
+                          const SizedBox(height: 4),
+                          const Text('تسجيل الدخول ببصمة الإصبع أو الوجه', style: TextStyle(color: AppTheme.goldLight, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 35),
                   const Text(
