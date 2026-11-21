@@ -71,10 +71,21 @@ if ($statusFilter) {
 }
 
 $stmt = $pdo->prepare("
-    SELECT ar.*, u.username AS requester_name, u2.username AS approver_name
+    SELECT ar.*, 
+           u.username AS requester_name, 
+           u.role AS requester_role,
+           u_inv.full_name AS requester_investor_name,
+           u2.username AS approver_name,
+           dep_inv.full_name AS deposit_investor_name,
+           wr_inv.full_name AS wr_investor_name
     FROM approval_requests ar
     LEFT JOIN users u ON u.id = ar.requested_by
+    LEFT JOIN investors u_inv ON u_inv.id = u.investor_id
     LEFT JOIN users u2 ON u2.id = ar.approved_by
+    LEFT JOIN deposits d ON (ar.entity_type = 'deposit' AND d.id = ar.entity_id)
+    LEFT JOIN investors dep_inv ON dep_inv.id = d.investor_id
+    LEFT JOIN withdraw_requests wr ON (ar.entity_type IN ('withdraw_request', 'withdraw_requests') AND wr.id = ar.entity_id)
+    LEFT JOIN investors wr_inv ON wr_inv.id = wr.investor_id
     WHERE " . implode(' AND ', $where) . "
     ORDER BY ar.created_at DESC
 ");
@@ -112,6 +123,7 @@ include __DIR__ . '/../includes/header.php';
                             <tr>
                                 <th>#</th>
                                 <th>نوع العملية</th>
+                                <th>المستثمر</th>
                                 <th>الكيان المستهدف</th>
                                 <th>المبلغ</th>
                                 <th>طالب العملية</th>
@@ -144,10 +156,45 @@ include __DIR__ . '/../includes/header.php';
                                             $rowCurrency = $wrCache[$eId]['currency'] ?? 'IQD';
                                         }
                                     }
+
+                                    // Resolve Investor Name
+                                    $investorName = $r['deposit_investor_name'] 
+                                        ?: $r['wr_investor_name'] 
+                                        ?: $r['requester_investor_name'] 
+                                        ?: null;
+
+                                    if (!$investorName && !empty($pl['deposit_id'])) {
+                                        static $depInvCache = [];
+                                        $dId = (int)$pl['deposit_id'];
+                                        if (!isset($depInvCache[$dId])) {
+                                            $st = $pdo->prepare("SELECT i.full_name FROM deposits d JOIN investors i ON i.id = d.investor_id WHERE d.id = ?");
+                                            $st->execute([$dId]);
+                                            $depInvCache[$dId] = $st->fetchColumn() ?: null;
+                                        }
+                                        $investorName = $depInvCache[$dId];
+                                    }
+
+                                    if (!$investorName && !empty($pl['investor_id'])) {
+                                        static $invCache = [];
+                                        $iId = (int)$pl['investor_id'];
+                                        if (!isset($invCache[$iId])) {
+                                            $st = $pdo->prepare("SELECT full_name FROM investors WHERE id = ?");
+                                            $st->execute([$iId]);
+                                            $invCache[$iId] = $st->fetchColumn() ?: null;
+                                        }
+                                        $investorName = $invCache[$iId];
+                                    }
                                 ?>
                                 <tr>
                                     <td><?= $r['id'] ?></td>
                                     <td><span class="badge bg-primary"><?= arabicOperationType($r['operation_type']) ?></span></td>
+                                    <td>
+                                        <?php if ($investorName): ?>
+                                            <span class="fw-bold text-white"><?= htmlspecialchars($investorName) ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?= htmlspecialchars($r['entity_type']) ?> #<?= $r['entity_id'] ?: '—' ?></td>
                                     <td>
                                         <?php if ($rowAmount !== null): ?>
@@ -156,7 +203,14 @@ include __DIR__ . '/../includes/header.php';
                                             <span class="text-muted">—</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td class="fw-bold"><?= htmlspecialchars($r['requester_name'] ?: 'مستثمر / نظام') ?></td>
+                                    <td>
+                                        <?php if (!empty($r['requester_investor_name'])): ?>
+                                            <span class="fw-bold text-info"><?= htmlspecialchars($r['requester_investor_name']) ?></span>
+                                            <div class="text-muted small" style="font-size:0.75rem">(<?= htmlspecialchars($r['requester_name']) ?>)</div>
+                                        <?php else: ?>
+                                            <span class="fw-bold"><?= htmlspecialchars($r['requester_name'] ?: 'مستثمر / نظام') ?></span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?= formatDate($r['created_at']) ?></td>
                                     <td><span class="badge <?= statusBadge($r['status']) ?>"><?= arabicStatus($r['status']) ?></span></td>
                                     <td>
@@ -211,7 +265,7 @@ include __DIR__ . '/../includes/header.php';
                                 </tr>
                             <?php endforeach; ?>
                             <?php if (empty($requests)): ?>
-                                <tr><td colspan="7" class="text-center text-muted py-4">لا توجد طلبات موافقة في الوقت الحالي</td></tr>
+                                <tr><td colspan="9" class="text-center text-muted py-4">لا توجد طلبات موافقة في الوقت الحالي</td></tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
