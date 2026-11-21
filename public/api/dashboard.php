@@ -68,6 +68,12 @@ foreach ($activeDeposits as $d) {
         }
     }
 
+    // Calculate pending withdrawal amount for this specific deposit
+    $pendingStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM withdraw_requests WHERE deposit_id = ? AND status = 'pending'");
+    $pendingStmt->execute([(int)$d['id']]);
+    $pendingForDep = (float)$pendingStmt->fetchColumn();
+    $availableToWithdraw = max(0.0, (float)$d['accumulated_profit'] - $pendingForDep);
+
     $formattedDeposits[] = [
         'id' => (int)$d['id'],
         'amount' => (float)$d['amount'],
@@ -79,6 +85,8 @@ foreach ($activeDeposits as $d) {
         'end_date' => $d['end_date'],
         'accumulated_profit' => (float)$d['accumulated_profit'],
         'paid_profit' => (float)$d['paid_profit'],
+        'pending_withdrawal' => $pendingForDep,
+        'available_to_withdraw' => $availableToWithdraw,
         'frequency_months' => (int)$d['profit_payout_frequency'],
         'next_profit_date' => $nextProfit ? $nextProfit->format('Y-m-d') : null,
         'next_payout_date' => $nextWithdrawalStr,
@@ -86,7 +94,7 @@ foreach ($activeDeposits as $d) {
     ];
 }
 
-// 3. Fetch Pending Withdrawal Requests Total
+// 3. Fetch Pending Withdrawal Requests Total and List
 $pStmt = $pdo->prepare("
     SELECT currency, COALESCE(SUM(amount), 0) AS pending_amount
     FROM withdraw_requests 
@@ -101,6 +109,17 @@ foreach ($pendingRows as $pr) {
         $pendingWithdrawals[$pr['currency']] = (float)$pr['pending_amount'];
     }
 }
+
+$pListStmt = $pdo->prepare("
+    SELECT wr.id, wr.deposit_id, wr.amount, wr.currency, wr.request_date, wr.status, wr.note,
+           d.amount AS deposit_principal
+    FROM withdraw_requests wr
+    LEFT JOIN deposits d ON d.id = wr.deposit_id
+    WHERE wr.investor_id = ? AND wr.status = 'pending'
+    ORDER BY wr.request_date DESC, wr.id DESC
+");
+$pListStmt->execute([$investorId]);
+$pendingWithdrawalsList = $pListStmt->fetchAll();
 
 // 4. Latest 5 Transactions
 $txStmt = $pdo->prepare("
@@ -122,6 +141,7 @@ apiResponse(true, [
     ],
     'summary' => $summary,
     'pending_withdrawals' => $pendingWithdrawals,
+    'pending_withdrawals_list' => $pendingWithdrawalsList,
     'earliest_next_payout' => $earliestNextPayout,
     'deposits' => $formattedDeposits,
     'recent_transactions' => $recentTransactions

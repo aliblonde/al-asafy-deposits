@@ -16,6 +16,7 @@ class AppTheme {
   static const Color borderGold = Color(0x33D4AF37);
   
   static const Color success = Color(0xFF2ECC71);
+  static const Color warning = Color(0xFFF39C12);
   static const Color danger = Color(0xFFE74C3C);
   static const Color info = Color(0xFF3498DB);
 
@@ -28,7 +29,6 @@ class AppTheme {
         primary: gold,
         secondary: goldLight,
         surface: bgSurface,
-        background: bgBase,
         error: danger,
       ),
       textTheme: GoogleFonts.tajawalTextTheme(

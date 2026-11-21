@@ -60,28 +60,41 @@ function calcNextProfitDate(array $deposit): ?DateTimeImmutable
  */
 function calcNextWithdrawalDate(array $deposit): ?DateTimeImmutable
 {
-    $base = $deposit['last_withdrawal_date'] ?? null;
-    $freq = (int) ($deposit['profit_payout_frequency'] ?? 1);
-
-    if ($base) {
-        $dt = DateTimeImmutable::createFromFormat('Y-m-d', $base);
-    } else {
-        $dt = DateTimeImmutable::createFromFormat('Y-m-d', $deposit['start_date']);
-    }
-    if (!$dt)
+    if (empty($deposit['start_date'])) {
         return null;
+    }
+    $startDt = DateTimeImmutable::createFromFormat('Y-m-d', $deposit['start_date']);
+    if (!$startDt) {
+        return null;
+    }
+
+    $freq = (int) ($deposit['profit_payout_frequency'] ?? 1);
+    if ($freq < 1) {
+        $freq = 1;
+    }
+
+    $base = $deposit['last_withdrawal_date'] ?? null;
 
     // If already withdrawn up to or past end_date, no further withdrawal cycles exist!
-    if (isset($deposit['end_date']) && $deposit['end_date'] && $base) {
-        if ($base >= $deposit['end_date']) {
+    if (!empty($deposit['end_date']) && $base) {
+        if (substr($base, 0, 10) >= $deposit['end_date']) {
             return null;
         }
     }
 
-    $next = $dt->modify('+' . $freq . ' month');
+    // Always calculate cycles based on start_date anniversary day
+    $next = $startDt->modify('+' . $freq . ' month');
+
+    if ($base) {
+        $baseDate = substr($base, 0, 10);
+        // Advance cycles according to the contract frequency until passing the last withdrawal date
+        while ($next->format('Y-m-d') <= $baseDate) {
+            $next = $next->modify('+' . $freq . ' month');
+        }
+    }
 
     // Cap final withdrawal due date at deposit end_date
-    if (isset($deposit['end_date']) && $deposit['end_date']) {
+    if (!empty($deposit['end_date'])) {
         $endDt = DateTimeImmutable::createFromFormat('Y-m-d', $deposit['end_date']);
         if ($endDt && $next > $endDt) {
             return $endDt;

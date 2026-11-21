@@ -63,6 +63,8 @@ class _DepositsTabState extends State<DepositsTab> {
                   final isActive = d['status'] == 'active';
                   final cur = d['currency'] ?? '';
                   final acc = (d['accumulated_profit'] ?? 0).toDouble();
+                  final pending = (d['pending_withdrawal'] ?? 0).toDouble();
+                  final available = (d['available_to_withdraw'] ?? (acc - pending)).clamp(0.0, double.infinity).toDouble();
 
                   return Card(
                     margin: const EdgeInsets.only(bottom: 16),
@@ -82,7 +84,7 @@ class _DepositsTabState extends State<DepositsTab> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: isActive ? AppTheme.success.withOpacity(0.15) : AppTheme.textMuted.withOpacity(0.2),
+                                  color: isActive ? AppTheme.success.withValues(alpha: 0.15) : AppTheme.textMuted.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -133,36 +135,66 @@ class _DepositsTabState extends State<DepositsTab> {
                             decoration: BoxDecoration(
                               color: AppTheme.bgBase,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: AppTheme.borderGold.withOpacity(0.5)),
+                              border: Border.all(color: AppTheme.borderGold.withValues(alpha: 0.5)),
                             ),
-                            child: Row(
+                            child: Column(
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('الأرباح المتراكمة الكلية', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${_numberFormat.format(acc)} $cur',
+                                            style: const TextStyle(color: AppTheme.success, fontWeight: FontWeight.bold, fontSize: 14),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('أرباح تم صرفها مسبقاً', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${_numberFormat.format(d['paid_profit'] ?? 0)} $cur',
+                                            style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 14),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (pending > 0) ...[
+                                  const Divider(color: AppTheme.borderGold, height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text('أرباح متراكمة جاهزة', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
-                                      const SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.hourglass_top, color: AppTheme.warning, size: 14),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'طلب سحب قيد المراجعة: -${_numberFormat.format(pending)} $cur',
+                                            style: const TextStyle(color: AppTheme.warning, fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
                                       Text(
-                                        '${_numberFormat.format(acc)} $cur',
-                                        style: const TextStyle(color: AppTheme.success, fontWeight: FontWeight.bold, fontSize: 14),
+                                        'متاح للسحب: ${_numberFormat.format(available)} $cur',
+                                        style: TextStyle(
+                                          color: available > 0 ? AppTheme.gold : AppTheme.textMuted,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ],
                                   ),
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text('أرباح تم صرفها مسبقاً', style: TextStyle(color: AppTheme.textMuted, fontSize: 11)),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${_numberFormat.format(d['paid_profit'] ?? 0)} $cur',
-                                        style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 14),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
@@ -185,17 +217,21 @@ class _DepositsTabState extends State<DepositsTab> {
                             ],
                           ),
 
-                          // Withdraw Button if accumulated profit available
+                          // Withdraw Button if active deposit
                           if (isActive && acc > 0) ...[
                             const SizedBox(height: 14),
                             OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: AppTheme.gold,
-                                side: const BorderSide(color: AppTheme.gold),
+                                foregroundColor: available > 0 ? AppTheme.gold : AppTheme.warning,
+                                side: BorderSide(color: available > 0 ? AppTheme.gold : AppTheme.warning.withValues(alpha: 0.5)),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
-                              icon: const Icon(Icons.wallet, size: 18),
-                              label: const Text('طلب سحب أرباح هذه الوديعة'),
+                              icon: Icon(available > 0 ? Icons.wallet : Icons.hourglass_top, size: 18),
+                              label: Text(
+                                available > 0
+                                    ? 'طلب سحب أرباح (متاح ${_numberFormat.format(available)} $cur)'
+                                    : 'الأرباح محجوزة بطلب سحب معلق (${_numberFormat.format(pending)} $cur)',
+                              ),
                               onPressed: () {
                                 showModalBottomSheet(
                                   context: context,
