@@ -277,4 +277,18 @@ class ApiService {
       return false;
     }
   }
+
+  // App Version & Force Update Check
+  static const String currentAppVersion = '1.0.0';
+
+  static Future<Map<String, dynamic>> checkAppVersion() async {
+    final url = Uri.parse('$baseUrl/app_version.php');
+    try {
+      final res = await http.get(url).timeout(const Duration(seconds: 6));
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data;
+    } catch (_) {
+      return {'success': false};
+    }
+  }
 }

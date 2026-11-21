@@ -34,6 +34,67 @@ class _ProfileTabState extends State<ProfileTab> {
 
   void _toggleBiometrics(bool value) async {
     if (value) {
+      final creds = await ApiService.getBiometricCredentials();
+      String? passwordToSave;
+
+      if (creds == null) {
+        // Prompt user to enter their password to bind it with biometrics
+        final pwdController = TextEditingController();
+        final formKey = GlobalKey<FormState>();
+        if (!mounted) return;
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: AppTheme.bgCard,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: AppTheme.gold, width: 1.5),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.fingerprint, color: AppTheme.gold),
+                SizedBox(width: 8),
+                Text('تفعيل الدخول بالبصمة', style: TextStyle(color: AppTheme.gold, fontSize: 16)),
+              ],
+            ),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('يرجى إدخال كلمة المرور الحالية لربطها بالبصمة وتسجيل الدخول السريع:'),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: pwdController,
+                    obscureText: true,
+                    validator: (v) => (v == null || v.isEmpty) ? 'كلمة المرور مطلوبة' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'كلمة المرور',
+                      prefixIcon: Icon(Icons.lock_outline, color: AppTheme.gold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('إلغاء')),
+              ElevatedButton(
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.of(ctx).pop(true);
+                  }
+                },
+                child: const Text('تأكيد'),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmed != true || pwdController.text.isEmpty) return;
+        passwordToSave = pwdController.text;
+      }
+
       final localAuth = LocalAuthentication();
       try {
         final canCheck = await localAuth.canCheckBiometrics || await localAuth.isDeviceSupported();
@@ -51,7 +112,12 @@ class _ProfileTabState extends State<ProfileTab> {
         );
 
         if (authenticated) {
-          await ApiService.setBiometricsEnabled(true);
+          if (passwordToSave != null) {
+            final u = _investor?['username'] ?? '';
+            await ApiService.saveBiometricCredentials(u, passwordToSave);
+          } else {
+            await ApiService.setBiometricsEnabled(true);
+          }
           if (!mounted) return;
           setState(() => _biometricsEnabled = true);
           ScaffoldMessenger.of(context).showSnackBar(

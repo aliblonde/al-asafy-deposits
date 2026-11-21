@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../constants/theme.dart';
 import '../services/api_service.dart';
 import 'main_nav_screen.dart';
@@ -23,15 +25,84 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _checkBiometrics();
+    _checkForceUpdate();
+  }
+
+  void _checkForceUpdate() async {
+    final res = await ApiService.checkAppVersion();
+    if (res['success'] == true && res['data'] != null && mounted) {
+      final data = res['data'] as Map<String, dynamic>;
+      final minVer = data['min_supported_version'] as String? ?? '1.0.0';
+      final force = data['force_update'] as bool? ?? false;
+      final curVer = ApiService.currentAppVersion;
+
+      if (force || curVer.compareTo(minVer) < 0) {
+        final updateUrl = data['download_url'] ?? data['store_url_android'] ?? '';
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => PopScope(
+            canPop: false,
+            child: AlertDialog(
+              backgroundColor: AppTheme.bgCard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: AppTheme.gold, width: 2),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Icons.system_update, color: AppTheme.gold, size: 28),
+                  const SizedBox(width: 10),
+                  Text(data['update_title'] ?? 'تحديث إجباري متوفر', style: const TextStyle(color: AppTheme.gold, fontSize: 16)),
+                ],
+              ),
+              content: Text(
+                data['update_message'] ?? 'يتوفر إصدار جديد إجباري من التطبيق. يرجى التحديث للمتابعة.',
+                style: const TextStyle(fontSize: 14),
+              ),
+              actions: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.download),
+                    label: const Text('تحديث التطبيق الآن', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () async {
+                      if (updateUrl.isNotEmpty) {
+                        final uri = Uri.parse(updateUrl);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _checkBiometrics() async {
     final enabled = await ApiService.isBiometricsEnabled();
     final creds = await ApiService.getBiometricCredentials();
-    if (enabled && creds != null) {
-      if (mounted) setState(() => _hasBiometrics = true);
-      // Auto-trigger biometric prompt on startup if enabled
-      _handleBiometricLogin();
+    if (creds != null) {
+      if (mounted) {
+        setState(() {
+          _hasBiometrics = true;
+          if (_usernameController.text.isEmpty && creds['username'] != null) {
+            _usernameController.text = creds['username']!;
+          }
+        });
+      }
+      if (enabled) {
+        // Auto-trigger biometric prompt after UI mounts
+        Future.delayed(const Duration(milliseconds: 350), () {
+          if (mounted) _handleBiometricLogin();
+        });
+      }
     }
   }
 
@@ -57,6 +128,13 @@ class _LoginScreenState extends State<LoginScreen> {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (_) => const MainNavScreen()),
             );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(res['message'] ?? 'فشل التحقق من الحساب، يرجى كتابة كلمة المرور.'),
+                backgroundColor: AppTheme.danger,
+              ),
+            );
           }
         }
       }
@@ -78,10 +156,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (res['success'] == true) {
-      final bioEnabled = await ApiService.isBiometricsEnabled();
-      if (bioEnabled) {
-        await ApiService.saveBiometricCredentials(u, p);
-      }
+      // Save credentials for seamless biometric authentication
+      await ApiService.saveBiometricCredentials(u, p);
+
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainNavScreen()),
