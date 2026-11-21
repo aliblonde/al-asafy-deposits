@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'constants/theme.dart';
 import 'services/api_service.dart';
+import 'services/fcm_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_nav_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppTheme.initTheme();
+  await FcmService.initialize();
   final token = await ApiService.getToken();
   runApp(AlAsafyApp(initialLoggedIn: token != null && token.isNotEmpty));
 }

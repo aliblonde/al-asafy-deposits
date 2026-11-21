@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "673269282219",
+    "project_id": "alasafy-investor",
+    "storage_bucket": "alasafy-investor.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673269282219:android:5d6177604e251a8c36ceee",
+        "android_client_info": {
+          "package_name": "com.alasafygroup.alasafy_investor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeAfpV3G0yFyQxHzRJFpZXkosYw57h_b8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
