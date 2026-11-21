@@ -1,0 +1,306 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../constants/theme.dart';
+import '../services/api_service.dart';
+import 'withdraw_dialog.dart';
+
+class HomeTab extends StatefulWidget {
+  const HomeTab({super.key});
+
+  @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
+  bool _isLoading = true;
+  Map<String, dynamic>? _data;
+  final _numberFormat = NumberFormat('#,##0.00');
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDashboard();
+  }
+
+  Future<void> _fetchDashboard() async {
+    setState(() => _isLoading = true);
+    final res = await ApiService.getDashboard();
+    setState(() {
+      _isLoading = false;
+      if (res['success'] == true) {
+        _data = res['data'] as Map<String, dynamic>?;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: AppTheme.gold)),
+      );
+    }
+
+    final investor = _data?['investor'] ?? {};
+    final summary = _data?['summary'] ?? {};
+    final nextPayout = _data?['earliest_next_payout'];
+    final deposits = (_data?['deposits'] as List?) ?? [];
+    final recentTx = (_data?['recent_transactions'] as List?) ?? [];
+
+    final usdSummary = summary['USD'] ?? {};
+    final iqdSummary = summary['IQD'] ?? {};
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('لوحة الحساب الاستثماري'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchDashboard,
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _fetchDashboard,
+        color: AppTheme.gold,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Welcome Header
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF202634), Color(0xFF14171E)],
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.borderGold),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: AppTheme.gold.withOpacity(0.2),
+                      child: const Icon(Icons.person, color: AppTheme.gold, size: 30),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('أهلاً بك،', style: TextStyle(color: AppTheme.textMuted, fontSize: 13)),
+                          Text(
+                            investor['full_name'] ?? 'المستثمر',
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Next Payout Banner if available
+              if (nextPayout != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.gold.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.gold.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: AppTheme.gold, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'أقرب موعد دوري لصرف الأرباح: $nextPayout',
+                          style: const TextStyle(color: AppTheme.goldLight, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Financial Cards (USD)
+              if ((usdSummary['principal'] ?? 0) > 0 || (usdSummary['accumulated_profit'] ?? 0) > 0) ...[
+                _buildCurrencyCard(
+                  currency: 'USD',
+                  currencySymbol: '\$',
+                  principal: (usdSummary['principal'] ?? 0).toDouble(),
+                  accumulated: (usdSummary['accumulated_profit'] ?? 0).toDouble(),
+                  paid: (usdSummary['paid_profit'] ?? 0).toDouble(),
+                  depositsCount: (usdSummary['deposits_count'] ?? 0).toInt(),
+                ),
+                const SizedBox(height: 14),
+              ],
+
+              // Financial Cards (IQD)
+              if ((iqdSummary['principal'] ?? 0) > 0 || (iqdSummary['accumulated_profit'] ?? 0) > 0) ...[
+                _buildCurrencyCard(
+                  currency: 'IQD',
+                  currencySymbol: 'د.ع',
+                  principal: (iqdSummary['principal'] ?? 0).toDouble(),
+                  accumulated: (iqdSummary['accumulated_profit'] ?? 0).toDouble(),
+                  paid: (iqdSummary['paid_profit'] ?? 0).toDouble(),
+                  depositsCount: (iqdSummary['deposits_count'] ?? 0).toInt(),
+                ),
+                const SizedBox(height: 14),
+              ],
+
+              // Fast Withdraw Action Button
+              ElevatedButton.icon(
+                icon: const Icon(Icons.wallet, color: Colors.black),
+                label: const Text('طلب صرف الأرباح المستحقة'),
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => WithdrawDialog(
+                      deposits: deposits,
+                      onSuccess: _fetchDashboard,
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              // Recent Transactions Preview
+              const Text(
+                'آخر الحركات المالية',
+                style: TextStyle(color: AppTheme.gold, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+
+              if (recentTx.isEmpty)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(
+                      child: Text('لا توجد حركات مالية مسجلة بعد', style: TextStyle(color: AppTheme.textMuted)),
+                    ),
+                  ),
+                )
+              else
+                ...recentTx.map((tx) => Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: tx['direction'] == 'credit'
+                              ? AppTheme.success.withOpacity(0.15)
+                              : AppTheme.danger.withOpacity(0.15),
+                          child: Icon(
+                            tx['direction'] == 'credit' ? Icons.arrow_downward : Icons.arrow_upward,
+                            color: tx['direction'] == 'credit' ? AppTheme.success : AppTheme.danger,
+                            size: 18,
+                          ),
+                        ),
+                        title: Text(
+                          tx['note'] ?? tx['type'] ?? 'معاملة',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        subtitle: Text(
+                          'إيصال: ${tx['receipt_no'] ?? '—'} | ${tx['date'] ?? ''}',
+                          style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                        ),
+                        trailing: Text(
+                          '${_numberFormat.format(double.tryParse(tx['amount'].toString()) ?? 0)} ${tx['currency']}',
+                          style: TextStyle(
+                            color: tx['direction'] == 'credit' ? AppTheme.success : AppTheme.gold,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    )),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCurrencyCard({
+    required String currency,
+    required String currencySymbol,
+    required double principal,
+    required double accumulated,
+    required double paid,
+    required int depositsCount,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'المحفظة ($currency)',
+                  style: const TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.gold.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text('$depositsCount ودائع نشطة', style: const TextStyle(color: AppTheme.goldLight, fontSize: 11)),
+                ),
+              ],
+            ),
+            const Divider(color: AppTheme.borderGold, height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('إجمالي رأس المال', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_numberFormat.format(principal)} $currencySymbol',
+                        style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('أرباح متراكمة جاهزة', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_numberFormat.format(accumulated)} $currencySymbol',
+                        style: const TextStyle(color: AppTheme.success, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
