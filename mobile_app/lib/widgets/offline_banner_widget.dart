@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../constants/theme.dart';
-import '../constants/localization.dart';
 
 class OfflineBannerWidget extends StatefulWidget {
   final Widget child;
@@ -78,9 +77,9 @@ class _OfflineBannerWidgetState extends State<OfflineBannerWidget> {
                 children: [
                   const Icon(Icons.wifi_off, color: Colors.white, size: 18),
                   const SizedBox(width: 8),
-                  Text(
-                    tr('offline_title'),
-                    style: const TextStyle(
+                  const Text(
+                    'أنت غير متصل بالإنترنت حالياً',
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,

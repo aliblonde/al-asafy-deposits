@@ -3,7 +3,7 @@ import 'package:al_asafy_investor/main.dart';
 
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const AlAsafyApp(initialLoggedIn: false));
+    await tester.pumpWidget(const AlAsafyApp());
     expect(find.byType(AlAsafyApp), findsOneWidget);
   });
 }

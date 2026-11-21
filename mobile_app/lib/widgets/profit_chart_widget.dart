@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../constants/theme.dart';
-import '../constants/localization.dart';
 
 class ProfitChartWidget extends StatefulWidget {
   final List<double> monthlyValues;
@@ -55,9 +54,9 @@ class _ProfitChartWidgetState extends State<ProfitChartWidget> {
                 children: [
                   const Icon(Icons.show_chart, color: AppTheme.gold, size: 22),
                   const SizedBox(width: 8),
-                  Text(
-                    tr('monthly_growth'),
-                    style: const TextStyle(
+                  const Text(
+                    'نمو الأرباح المتراكمة (شهرياً)',
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
                       color: AppTheme.gold,

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../constants/theme.dart';
-import '../constants/localization.dart';
 import '../services/api_service.dart';
 import '../services/fcm_service.dart';
 import '../widgets/profit_chart_widget.dart';

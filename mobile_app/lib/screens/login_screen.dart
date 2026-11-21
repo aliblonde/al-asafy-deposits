@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/theme.dart';
 import '../services/api_service.dart';
@@ -199,8 +198,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           colors: [AppTheme.bgCard, AppTheme.bgBase],
                         ),
                       ),
-                      child: const Center(
-                        child: Icon(Icons.account_balance, color: AppTheme.gold, size: 45),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Image.asset('assets/images/app_logo.png', fit: BoxFit.contain),
+                        ),
                       ),
                     ),
                   ),
