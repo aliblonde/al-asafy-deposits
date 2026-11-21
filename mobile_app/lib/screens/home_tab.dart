@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../constants/theme.dart';
 import '../services/api_service.dart';
+import '../services/fcm_service.dart';
 import 'withdraw_dialog.dart';
 import 'notifications_sheet.dart';
 
@@ -26,10 +27,18 @@ class _HomeTabState extends State<HomeTab> {
   Future<void> _fetchDashboard() async {
     setState(() => _isLoading = true);
     final res = await ApiService.getDashboard();
+    if (!mounted) return;
     setState(() {
       _isLoading = false;
       if (res['success'] == true) {
         _data = res['data'] as Map<String, dynamic>?;
+        final invId = _data?['investor']?['id'];
+        if (invId != null) {
+          final idNum = invId is int ? invId : int.tryParse(invId.toString()) ?? 0;
+          if (idNum > 0) {
+            FcmService.subscribeToInvestor(idNum);
+          }
+        }
       }
     });
   }

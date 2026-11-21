@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../constants/theme.dart';
 import '../services/api_service.dart';
 import 'home_tab.dart';
 import 'deposits_tab.dart';
 import 'transactions_tab.dart';
 import 'profile_tab.dart';
+import 'notifications_sheet.dart';
 
 class MainNavScreen extends StatefulWidget {
   const MainNavScreen({super.key});
@@ -22,6 +24,62 @@ class _MainNavScreenState extends State<MainNavScreen> {
     TransactionsTab(),
     ProfileTab(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen for foreground push notifications and show an in-app gold toast banner
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (message.notification != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.bgSurface,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: AppTheme.gold, width: 1.5),
+            ),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: 'عرض',
+              textColor: AppTheme.gold,
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const NotificationsSheet(),
+                );
+              },
+            ),
+            content: Row(
+              children: [
+                const Icon(Icons.notifications_active, color: AppTheme.gold),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message.notification!.title ?? 'إشعار جديد',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.gold),
+                      ),
+                      if (message.notification!.body != null)
+                        Text(
+                          message.notification!.body!,
+                          style: const TextStyle(fontSize: 12, color: Colors.white),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
