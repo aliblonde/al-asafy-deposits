@@ -258,7 +258,7 @@ function renderLogData(?string $json): string {
         'paid' => 'مدفوع',
     ];
 
-    $html = '<div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 6px 10px; font-size: 0.82rem;">';
+    $html = '<div style="background: var(--bg-base); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 0.84rem;">';
     foreach ($data as $k => $v) {
         $label = $labels[$k] ?? $k;
         if (is_array($v)) {
@@ -272,9 +272,10 @@ function renderLogData(?string $json): string {
                 $valStr = number_format((float)$v, 2) . ' ' . $data['currency'];
             }
         }
-        $html .= '<div class="d-flex justify-content-between align-items-center gap-2 py-1 border-bottom border-secondary border-opacity-25">';
-        $html .= '<span style="color: #ffffff; font-weight: 600; white-space: nowrap;">' . htmlspecialchars($label) . ':</span>';
-        $html .= '<span style="color: #ffd700; font-weight: bold; text-align: left; word-break: break-all;">' . htmlspecialchars($valStr) . '</span>';
+        $valColor = in_array($k, ['amount', 'new_amount', 'difference']) ? 'var(--gold)' : 'var(--text-primary)';
+        $html .= '<div class="d-flex justify-content-between align-items-center gap-3 py-1 border-bottom" style="border-color: var(--border) !important;">';
+        $html .= '<span style="color: var(--text-muted); font-weight: 600; white-space: nowrap;">' . htmlspecialchars($label) . ':</span>';
+        $html .= '<span style="color: ' . $valColor . '; font-weight: 700; text-align: left; word-break: break-all;">' . htmlspecialchars($valStr) . '</span>';
         $html .= '</div>';
     }
     $html .= '</div>';
@@ -433,7 +434,7 @@ include __DIR__ . '/../includes/header.php';
                                     </td>
                                     <td>
                                         <?php if (!empty($log['investor_name'])): ?>
-                                            <span class="fw-bold text-white"><?= htmlspecialchars($log['investor_name']) ?></span>
+                                            <span class="fw-bold" style="color: var(--text-primary);"><?= htmlspecialchars($log['investor_name']) ?></span>
                                             <div class="text-muted small" style="font-size:0.75rem">(<?= htmlspecialchars($log['username']) ?>)</div>
                                         <?php else: ?>
                                             <span class="badge bg-secondary"><?= htmlspecialchars($log['username'] ?? 'النظام') ?></span>
@@ -444,11 +445,11 @@ include __DIR__ . '/../includes/header.php';
                                         <div class="text-muted small font-monospace mt-1" style="font-size:0.7rem"><?= htmlspecialchars($log['action']) ?></div>
                                     </td>
                                     <td>
-                                        <span class="fw-bold text-white"><?= htmlspecialchars(arabicLogEntity($log['entity'])) ?></span>
+                                        <span class="fw-bold" style="color: var(--text-primary);"><?= htmlspecialchars(arabicLogEntity($log['entity'])) ?></span>
                                     </td>
                                     <td>
                                         <?php if ($log['entity_id']): ?>
-                                            <span class="badge bg-dark border border-warning text-gold fw-bold" style="font-size:0.8rem">#<?= $log['entity_id'] ?></span>
+                                            <span class="badge" style="background: var(--bg-base); border: 1px solid var(--border); color: var(--gold); font-size:0.8rem; font-weight:bold;">#<?= $log['entity_id'] ?></span>
                                         <?php else: ?>
                                             <span class="text-muted">—</span>
                                         <?php endif; ?>

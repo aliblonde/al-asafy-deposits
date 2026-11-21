@@ -190,7 +190,7 @@ include __DIR__ . '/../includes/header.php';
                                     <td><span class="badge bg-primary"><?= arabicOperationType($r['operation_type']) ?></span></td>
                                     <td>
                                         <?php if ($investorName): ?>
-                                            <span class="fw-bold text-white"><?= htmlspecialchars($investorName) ?></span>
+                                            <span class="fw-bold" style="color: var(--text-primary);"><?= htmlspecialchars($investorName) ?></span>
                                         <?php else: ?>
                                             <span class="text-muted">—</span>
                                         <?php endif; ?>
