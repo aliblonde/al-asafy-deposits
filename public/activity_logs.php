@@ -190,20 +190,24 @@ function renderLogData(?string $json): string {
         'currency' => 'العملة',
         'deposit_id' => 'رقم الوديعة',
         'investor_id' => 'رقم المستثمر',
-        'withdraw_request_id' => 'رقم طلب السحب',
-        'approval_request_id' => 'رقم الاعتماد',
-        'role' => 'الدور / الصلاحية',
-        'month' => 'الشهر',
+        'withdraw_request_id' => 'طلب السحب',
+        'approval_request_id' => 'طلب الاعتماد',
+        'request_id' => 'رقم الطلب',
+        'entity_id' => 'رقم الكيان',
+        'rejecter_id' => 'المشرف الرافض',
+        'approver_id' => 'المشرف المعتمد',
+        'role' => 'نوع الحساب',
+        'month' => 'الشهر المستهدف',
         'note' => 'الملاحظة',
         'reason' => 'السبب',
         'description' => 'الوصف',
-        'operation' => 'العملية',
-        'entity' => 'الكيان',
+        'operation' => 'نوع العملية',
+        'entity' => 'الكيان المعني',
         'action' => 'الإجراء',
-        'deleted_count' => 'عدد المحذوف',
+        'deleted_count' => 'المحذوف',
         'period' => 'الفترة',
         'rows' => 'الصفوف',
-        'report' => 'التقرير',
+        'report' => 'نوع التقرير',
         'username' => 'اسم الحساب',
         'full_name' => 'الاسم الكامل',
         'phone' => 'الهاتف',
@@ -216,12 +220,45 @@ function renderLogData(?string $json): string {
         'old_amount' => 'المبلغ القديم',
         'new_amount' => 'المبلغ الجديد',
         'difference' => 'الفرق',
-        'direction' => 'الاتجاه',
-        'new_deposit_type_id' => 'النوع الجديد',
+        'direction' => 'نوع التعديل',
+        'new_deposit_type_id' => 'نوع الوديعة الجديد',
         'new_start_date' => 'تاريخ البدء الجديد',
+        'count' => 'العدد',
+        'hash' => 'رمز التشفير',
+        'max_id' => 'آخر معرّف',
+        'error_ref' => 'رمز الخطأ',
     ];
 
-    $html = '<div class="p-2 rounded bg-dark border border-secondary border-opacity-50" style="font-size:0.75rem">';
+    $valuesMap = [
+        'withdrawals.approve' => 'اعتماد صرف أرباح',
+        'profits.payout' => 'صرف أرباح',
+        'profits.manual' => 'إضافة ربح يدوي',
+        'deposits.financial_change' => 'تعديل مالي للوديعة',
+        'deposits.close' => 'إغلاق الوديعة',
+        'rates.declaration' => 'إعلان نسب الأرباح',
+        'withdraw_request' => 'طلب سحب',
+        'withdraw_requests' => 'طلبات السحب',
+        'deposit' => 'وديعة',
+        'deposits' => 'الودائع',
+        'approval_request' => 'طلب اعتماد',
+        'approval_requests' => 'طلبات الاعتماد',
+        'user' => 'مستخدم',
+        'users' => 'المستخدمون',
+        'investor' => 'مستثمر',
+        'investors' => 'المستثمرون',
+        'deposit_type' => 'نوع الوديعة',
+        'admin' => 'إدارة النظام (Admin)',
+        'staff' => 'موظف (Staff)',
+        'increase' => 'زيادة رأس المال',
+        'decrease' => 'تخفيض رأس المال',
+        'pending' => 'معلق',
+        'approved' => 'معتمد',
+        'rejected' => 'مرفوض',
+        'executed' => 'منفذ',
+        'paid' => 'مدفوع',
+    ];
+
+    $html = '<div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 6px; padding: 6px 10px; font-size: 0.82rem;">';
     foreach ($data as $k => $v) {
         $label = $labels[$k] ?? $k;
         if (is_array($v)) {
@@ -229,14 +266,15 @@ function renderLogData(?string $json): string {
         } elseif (is_bool($v)) {
             $valStr = $v ? 'نعم' : 'لا';
         } else {
-            $valStr = (string)$v;
+            $rawVal = (string)$v;
+            $valStr = $valuesMap[$rawVal] ?? $rawVal;
             if ($k === 'amount' && isset($data['currency'])) {
                 $valStr = number_format((float)$v, 2) . ' ' . $data['currency'];
             }
         }
         $html .= '<div class="d-flex justify-content-between align-items-center gap-2 py-1 border-bottom border-secondary border-opacity-25">';
-        $html .= '<span class="text-muted" style="white-space:nowrap">' . htmlspecialchars($label) . ':</span>';
-        $html .= '<span class="fw-bold text-gold text-end" style="word-break:break-all">' . htmlspecialchars($valStr) . '</span>';
+        $html .= '<span style="color: #ffffff; font-weight: 600; white-space: nowrap;">' . htmlspecialchars($label) . ':</span>';
+        $html .= '<span style="color: #ffd700; font-weight: bold; text-align: left; word-break: break-all;">' . htmlspecialchars($valStr) . '</span>';
         $html .= '</div>';
     }
     $html .= '</div>';
@@ -406,11 +444,14 @@ include __DIR__ . '/../includes/header.php';
                                         <div class="text-muted small font-monospace mt-1" style="font-size:0.7rem"><?= htmlspecialchars($log['action']) ?></div>
                                     </td>
                                     <td>
-                                        <span class="fw-bold"><?= htmlspecialchars(arabicLogEntity($log['entity'])) ?></span>
-                                        <div class="text-muted small font-monospace" style="font-size:0.7rem"><?= htmlspecialchars($log['entity']) ?></div>
+                                        <span class="fw-bold text-white"><?= htmlspecialchars(arabicLogEntity($log['entity'])) ?></span>
                                     </td>
                                     <td>
-                                        <?= $log['entity_id'] ? '#' . $log['entity_id'] : '—' ?>
+                                        <?php if ($log['entity_id']): ?>
+                                            <span class="badge bg-dark border border-warning text-gold fw-bold" style="font-size:0.8rem">#<?= $log['entity_id'] ?></span>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <?= renderLogData($log['old_data']) ?>
