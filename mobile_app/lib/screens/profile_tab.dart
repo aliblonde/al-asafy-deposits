@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/theme.dart';
+import '../constants/localization.dart';
 import '../services/api_service.dart';
 import 'login_screen.dart';
 
@@ -14,12 +17,30 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> {
   Map<String, dynamic>? _investor;
   bool _biometricsEnabled = false;
+  bool _privacyEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _loadInvestor();
     _loadBiometricsStatus();
+    _loadPrivacyStatus();
+  }
+
+  void _loadPrivacyStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('app_privacy_secure') ?? true;
+    if (mounted) setState(() => _privacyEnabled = enabled);
+  }
+
+  void _togglePrivacyProtection(bool value) async {
+    setState(() => _privacyEnabled = value);
+    try {
+      const channel = MethodChannel('com.alasafygroup.alasafy_investor/security');
+      await channel.invokeMethod('setSecure', {'secure': value});
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('app_privacy_secure', value);
+    } catch (_) {}
   }
 
   void _loadInvestor() async {
@@ -439,6 +460,41 @@ class _ProfileTabState extends State<ProfileTab> {
                     subtitle: const Text('07731111861 — رد مباشر ومساعدتك في حسابك', style: TextStyle(fontSize: 11)),
                     trailing: const Icon(Icons.chevron_left, color: AppTheme.textMuted),
                     onTap: ApiService.openWhatsAppSupport,
+                  ),
+                  const Divider(color: AppTheme.borderGold, height: 1),
+
+                  // Language Switcher Tile
+                  ValueListenableBuilder<Locale>(
+                    valueListenable: AppLocale.localeNotifier,
+                    builder: (ctx, locale, _) {
+                      final isAr = locale.languageCode == 'ar';
+                      return ListTile(
+                        leading: const Icon(Icons.language, color: AppTheme.gold),
+                        title: const Text('اللغة (Language)'),
+                        subtitle: Text(isAr ? 'العربية (Arabic)' : 'English (الإنجليزية)', style: const TextStyle(fontSize: 11)),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.gold.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppTheme.gold, width: 1),
+                          ),
+                          child: Text(isAr ? 'EN' : 'عربي', style: const TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                        onTap: AppLocale.toggleLanguage,
+                      );
+                    },
+                  ),
+                  const Divider(color: AppTheme.borderGold, height: 1),
+
+                  // Privacy Protection (FLAG_SECURE) Toggle
+                  SwitchListTile(
+                    secondary: const Icon(Icons.security, color: AppTheme.gold),
+                    title: const Text('حماية الخصوصية (إخفاء الشاشة)'),
+                    subtitle: Text(_privacyEnabled ? 'حظر لقطات الشاشة وإخفاء البيانات في قائمة التطبيقات' : 'غير مفعل', style: const TextStyle(fontSize: 11)),
+                    value: _privacyEnabled,
+                    activeColor: AppTheme.gold,
+                    onChanged: _togglePrivacyProtection,
                   ),
                 ],
               ),
