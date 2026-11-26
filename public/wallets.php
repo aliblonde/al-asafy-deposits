@@ -572,13 +572,19 @@ include __DIR__ . '/../includes/header.php';
                                                 </div>
                                             </td>
                                             <td class="text-center">
-                                                <div class="btn-group btn-group-sm">
+                                                <div class="d-flex justify-content-center gap-1">
                                                     <?php if ($canAdjust): ?>
-                                                        <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#adjustModal<?= $w['id'] ?>">
-                                                            <i class="bi bi-sliders me-1"></i>تعديل / سحب / تصفير
+                                                        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#adjustModal<?= $w['id'] ?>" onclick="setModalAction(<?= $w['id'] ?>, 'deduct')">
+                                                            <i class="bi bi-dash-circle me-1"></i>سحب
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#adjustModal<?= $w['id'] ?>" onclick="setModalAction(<?= $w['id'] ?>, 'reset_zero')">
+                                                            <i class="bi bi-arrow-counterclockwise me-1"></i>تصفير
+                                                        </button>
+                                                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#adjustModal<?= $w['id'] ?>" onclick="setModalAction(<?= $w['id'] ?>, 'credit')">
+                                                            <i class="bi bi-plus-circle me-1"></i>شحن
                                                         </button>
                                                     <?php endif; ?>
-                                                    <a href="wallets.php?tab=ledger&investor_id=<?= $w['id'] ?>" class="btn btn-outline-secondary" title="عرض سجل العمليات">
+                                                    <a href="wallets.php?tab=ledger&investor_id=<?= $w['id'] ?>" class="btn btn-sm btn-outline-secondary" title="عرض سجل العمليات">
                                                         <i class="bi bi-journal-text"></i>
                                                     </a>
                                                 </div>
@@ -806,6 +812,14 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <script>
+function setModalAction(id, action) {
+    const select = document.querySelector('.action-select-' + id);
+    if (select) {
+        select.value = action;
+        handleActionChange(id);
+    }
+}
+
 function handleActionChange(id) {
     const select = document.querySelector('.action-select-' + id);
     const amountGroup = document.getElementById('amountGroup' + id);

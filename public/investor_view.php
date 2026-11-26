@@ -189,6 +189,159 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($action === 'deduct_wallet') {
+        if (!userCan('wallets.adjust') && !userCan('investors.edit') && currentRole() !== 'admin') {
+            http_response_code(403);
+            setFlash('danger', 'ليس لديك صلاحية لخصم أو سحب رصيد من المحفظة.');
+            header('Location: investor_view.php?id=' . $id);
+            exit;
+        }
+
+        $amount = (float)($_POST['amount'] ?? 0);
+        $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
+        $note = trim((string)($_POST['note'] ?? ''));
+
+        if ($amount <= 0) {
+            setFlash('danger', 'يرجى إدخال مبلغ سحب صحيح أكبر من الصفر.');
+        } elseif (empty($note)) {
+            setFlash('danger', 'يرجى كتابة سبب الخصم/السحب الإداري لتوثيقه في السجل.');
+        } elseif (!in_array($currency, ['USD', 'IQD'], true)) {
+            setFlash('danger', 'العملة المختارة غير مدعومة.');
+        } else {
+            try {
+                $pdo->beginTransaction();
+
+                $bStmt = $pdo->prepare("SELECT balance FROM wallet_balances WHERE investor_id = ? AND currency = ? FOR UPDATE");
+                $bStmt->execute([$id, $currency]);
+                $currBal = (float)($bStmt->fetchColumn() ?: 0.0);
+
+                if ($amount > $currBal) {
+                    throw new Exception("المبلغ المراد سحبه (" . formatMoney($amount, $currency) . ") أكبر من رصيد المحفظة المتاح حالياً (" . formatMoney($currBal, $currency) . ").");
+                }
+
+                $newBal = max(0.0, $currBal - $amount);
+                $upWb = $pdo->prepare("UPDATE wallet_balances SET balance = ?, updated_at = NOW() WHERE investor_id = ? AND currency = ?");
+                $upWb->execute([$newBal, $id, $currency]);
+
+                $txW = $pdo->prepare("
+                    INSERT INTO wallet_transactions (investor_id, type, direction, amount, currency, balance_after, note, created_by, created_at)
+                    VALUES (?, 'admin_debit', 'debit', ?, ?, ?, ?, ?, NOW())
+                ");
+                $txW->execute([$id, $amount, $currency, $newBal, "[خصم/سحب إداري] {$note}", currentUserId()]);
+
+                $receiptNo = 'WDR-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -5));
+                $txMain = $pdo->prepare("
+                    INSERT INTO transactions (receipt_no, investor_id, type, direction, amount, currency, date, note)
+                    VALUES (?, ?, 'withdrawal', 'debit', ?, ?, NOW(), ?)
+                ");
+                $txMain->execute([$receiptNo, $id, $amount, $currency, "[خصم محفظة إداري] {$note}"]);
+
+                logActivity($pdo, 'ADMIN_DEDUCT_WALLET', 'wallet_balances', $id, ['old_balance' => $currBal], [
+                    'admin_id' => currentUserId(),
+                    'investor_id' => $id,
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'new_balance' => $newBal,
+                    'note' => $note
+                ]);
+
+                $pdo->commit();
+
+                $fmtAmt = number_format($amount, 2);
+                notifyInvestor(
+                    $pdo,
+                    $id,
+                    'إشعار سحب من المحفظة ⚠️',
+                    "تم سحب/خصم مبلغ {$fmtAmt} {$currency} من محفظتك من قبل الإدارة. السبب: {$note}",
+                    'wallet'
+                );
+
+                setFlash('success', "تم سحب مبلغ {$fmtAmt} {$currency} من محفظة المستثمر بنجاح وتوثيق العملية في السجل.");
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                setFlash('danger', 'حدث خطأ أثناء السحب من المحفظة: ' . $e->getMessage());
+            }
+        }
+        header('Location: investor_view.php?id=' . $id);
+        exit;
+    }
+
+    if ($action === 'reset_wallet') {
+        if (!userCan('wallets.adjust') && !userCan('investors.edit') && currentRole() !== 'admin') {
+            http_response_code(403);
+            setFlash('danger', 'ليس لديك صلاحية لتصفير المحفظة.');
+            header('Location: investor_view.php?id=' . $id);
+            exit;
+        }
+
+        $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
+        $note = trim((string)($_POST['note'] ?? 'تصفير رصيد المحفظة إدارياً'));
+
+        if (!in_array($currency, ['USD', 'IQD'], true)) {
+            setFlash('danger', 'العملة المختارة غير مدعومة.');
+        } elseif (empty($note)) {
+            setFlash('danger', 'يرجى كتابة سبب التصفير لتوثيقه في السجل والرقابة.');
+        } else {
+            try {
+                $pdo->beginTransaction();
+
+                $bStmt = $pdo->prepare("SELECT balance FROM wallet_balances WHERE investor_id = ? AND currency = ? FOR UPDATE");
+                $bStmt->execute([$id, $currency]);
+                $currBal = (float)($bStmt->fetchColumn() ?: 0.0);
+
+                if ($currBal <= 0) {
+                    throw new Exception("رصيد محفظة المستثمر بالـ {$currency} مصفّر بالفعل (0.00).");
+                }
+
+                $upWb = $pdo->prepare("UPDATE wallet_balances SET balance = 0.00, updated_at = NOW() WHERE investor_id = ? AND currency = ?");
+                $upWb->execute([$id, $currency]);
+
+                $txW = $pdo->prepare("
+                    INSERT INTO wallet_transactions (investor_id, type, direction, amount, currency, balance_after, note, created_by, created_at)
+                    VALUES (?, 'admin_reset', 'debit', ?, ?, 0.00, ?, ?, NOW())
+                ");
+                $txW->execute([$id, $currBal, $currency, "[تصفير رصيد إداري] {$note}", currentUserId()]);
+
+                $receiptNo = 'RST-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -5));
+                $txMain = $pdo->prepare("
+                    INSERT INTO transactions (receipt_no, investor_id, type, direction, amount, currency, date, note)
+                    VALUES (?, ?, 'withdrawal', 'debit', ?, ?, NOW(), ?)
+                ");
+                $txMain->execute([$receiptNo, $id, $currBal, $currency, "[تصفير محفظة إداري] {$note}"]);
+
+                logActivity($pdo, 'ADMIN_RESET_WALLET', 'wallet_balances', $id, ['old_balance' => $currBal], [
+                    'admin_id' => currentUserId(),
+                    'investor_id' => $id,
+                    'reset_amount' => $currBal,
+                    'currency' => $currency,
+                    'note' => $note
+                ]);
+
+                $pdo->commit();
+
+                $fmtAmt = number_format($currBal, 2);
+                notifyInvestor(
+                    $pdo,
+                    $id,
+                    'تصفير رصيد المحفظة ℹ️',
+                    "تم تصفير رصيد محفظتك بقيمة {$fmtAmt} {$currency} من قبل الإدارة. البيان: {$note}",
+                    'wallet'
+                );
+
+                setFlash('success', "تم تصفير رصيد محفظة المستثمر بالـ {$currency} بنجاح (المبلغ المصفّر: {$fmtAmt} {$currency}).");
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                setFlash('danger', 'حدث خطأ أثناء تصفير المحفظة: ' . $e->getMessage());
+            }
+        }
+        header('Location: investor_view.php?id=' . $id);
+        exit;
+    }
+
     if ($action === 'reset_password') {
         // Section 4: Require explicit permission for password reset
         if (!userCan('investor_accounts.reset_password')) {
@@ -290,9 +443,15 @@ include __DIR__ . '/../includes/header.php';
             <div class="page-header">
                 <h1 class="page-title"><i class="bi bi-person-lines-fill me-2"></i>عرض بيانات المستثمر</h1>
                 <div class="d-flex gap-2">
-                                        <?php if (userCan('investors.edit')): ?>
+                    <?php if (userCan('wallets.adjust') || userCan('investors.edit') || currentRole() === 'admin'): ?>
                     <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
-                        <i class="bi bi-wallet2 me-1"></i> شحن المحفظة
+                        <i class="bi bi-plus-circle me-1"></i> شحن المحفظة
+                    </button>
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#deductWalletModal">
+                        <i class="bi bi-dash-circle me-1"></i> سحب من المحفظة
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#resetWalletModal">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> تصفير المحفظة
                     </button>
                     <?php endif; ?>
                     <a href="investor_add.php?edit=<?= $id ?>" class="btn btn-outline-gold btn-sm">
@@ -364,10 +523,18 @@ include __DIR__ . '/../includes/header.php';
                             <h5 class="section-title mb-0 text-gold">
                                 <i class="bi bi-wallet2 me-2"></i>رصيد المحفظة المتاح (الأرباح والرصيد المشحون)
                             </h5>
-                            <?php if (userCan('investors.edit')): ?>
-                            <button type="button" class="btn btn-sm btn-gold" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
-                                <i class="bi bi-plus-circle me-1"></i> إضافة رصيد
-                            </button>
+                            <?php if (userCan('wallets.adjust') || userCan('investors.edit') || currentRole() === 'admin'): ?>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
+                                    <i class="bi bi-plus-circle me-1"></i> شحن رصيد
+                                </button>
+                                <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#deductWalletModal">
+                                    <i class="bi bi-dash-circle me-1"></i> سحب رصيد
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#resetWalletModal">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> تصفير المحفظة
+                                </button>
+                            </div>
                             <?php endif; ?>
                         </div>
                         <div class="row g-3">
@@ -514,10 +681,18 @@ include __DIR__ . '/../includes/header.php';
                             <h5 class="section-title mb-0 text-gold">
                                 <i class="bi bi-wallet2 me-2"></i>رصيد المحفظة المتاح (الأرباح والرصيد المشحون)
                             </h5>
-                            <?php if (userCan('investors.edit')): ?>
-                            <button type="button" class="btn btn-sm btn-gold" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
-                                <i class="bi bi-plus-circle me-1"></i> إضافة رصيد
-                            </button>
+                            <?php if (userCan('wallets.adjust') || userCan('investors.edit') || currentRole() === 'admin'): ?>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
+                                    <i class="bi bi-plus-circle me-1"></i> شحن رصيد
+                                </button>
+                                <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#deductWalletModal">
+                                    <i class="bi bi-dash-circle me-1"></i> سحب رصيد
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#resetWalletModal">
+                                    <i class="bi bi-arrow-counterclockwise me-1"></i> تصفير المحفظة
+                                </button>
+                            </div>
                             <?php endif; ?>
                         </div>
                         <div class="row g-3">
@@ -588,9 +763,15 @@ include __DIR__ . '/../includes/header.php';
                                     <small class="text-muted">المستثمر لا يملك وصولاً للبوابة</small>
                                 </div>
                             </div>
-                                                <?php if (userCan('investors.edit')): ?>
+                            <?php if (userCan('wallets.adjust') || userCan('investors.edit') || currentRole() === 'admin'): ?>
                     <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
-                        <i class="bi bi-wallet2 me-1"></i> شحن المحفظة
+                        <i class="bi bi-plus-circle me-1"></i> شحن المحفظة
+                    </button>
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#deductWalletModal">
+                        <i class="bi bi-dash-circle me-1"></i> سحب من المحفظة
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#resetWalletModal">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> تصفير المحفظة
                     </button>
                     <?php endif; ?>
                     <a href="investor_add.php?edit=<?= $id ?>" class="btn btn-gold btn-sm w-100 mt-3">إنشاء حساب
@@ -670,6 +851,91 @@ include __DIR__ . '/../includes/header.php';
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
                 <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i>تأكيد الشحن الفوري</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Deduct Wallet Modal -->
+<div class="modal fade" id="deductWalletModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="" class="modal-content text-start" dir="rtl">
+            <div class="modal-header bg-dark border-secondary">
+                <h5 class="modal-title text-warning"><i class="bi bi-dash-circle me-2"></i>سحب / خصم رصيد من المحفظة</h5>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-dark text-white">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="deduct_wallet">
+                
+                <div class="alert alert-warning py-2 small mb-3">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    سيتم خصم هذا المبلغ من رصيد المحفظة الحر للمستثمر وتوثيقه في السجل المالي، وإرسال إشعار فوري له.
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">المبلغ المطلوب سحبه / خصمه <span class="text-danger">*</span></label>
+                    <input type="number" name="amount" step="0.01" min="0.01" class="form-control" required placeholder="0.00">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">العملة <span class="text-danger">*</span></label>
+                    <select name="currency" class="form-select" required>
+                        <option value="USD">دولار أمريكي (USD) — الحالي: <?= formatMoney($walletBalances['USD'] ?? 0, 'USD') ?></option>
+                        <option value="IQD">دينار عراقي (IQD) — الحالي: <?= formatMoney($walletBalances['IQD'] ?? 0, 'IQD') ?></option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">سبب السحب / الخصم <span class="text-danger">*</span></label>
+                    <input type="text" name="note" class="form-control" required placeholder="مثال: تسليم نقدي، سحب بناء على طلب المستثمر، تصحيح قيد...">
+                </div>
+            </div>
+            <div class="modal-footer bg-dark border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" class="btn btn-warning" onclick="return confirm('هل أنت متأكد من خصم هذا المبلغ من محفظة المستثمر؟')">
+                    <i class="bi bi-check-circle me-1"></i>تأكيد السحب والخصم
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Reset Wallet Modal -->
+<div class="modal fade" id="resetWalletModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="" class="modal-content text-start" dir="rtl">
+            <div class="modal-header bg-dark border-danger">
+                <h5 class="modal-title text-danger"><i class="bi bi-arrow-counterclockwise me-2"></i>تصفير رصيد المحفظة</h5>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-dark text-white">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="reset_wallet">
+                
+                <div class="alert alert-danger py-2 small mb-3">
+                    <i class="bi bi-shield-slash me-1"></i>
+                    <strong>تحذير:</strong> هذا الإجراء سيقوم بإعادة رصيد المحفظة للعملة المختارة إلى <strong>0.00</strong> فوراً وتوثيق العملية في سجل التدقيق.
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">اختر محفظة العملة المراد تصفيرها: <span class="text-danger">*</span></label>
+                    <select name="currency" class="form-select" required>
+                        <option value="USD">محفظة الدولار (USD) — الرصيد: <?= formatMoney($walletBalances['USD'] ?? 0, 'USD') ?></option>
+                        <option value="IQD">محفظة الدينار (IQD) — الرصيد: <?= formatMoney($walletBalances['IQD'] ?? 0, 'IQD') ?></option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">سبب تصفير المحفظة <span class="text-danger">*</span></label>
+                    <textarea name="note" class="form-control" rows="2" required placeholder="اكتب سبب التصفير بوضوح للتوثيق والرقابة المالية..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer bg-dark border-danger">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" class="btn btn-danger" onclick="return confirm('تأكيد نهائي: هل أنت متأكد من تصفير رصيد محفظة هذا المستثمر؟ لا يمكن التراجع عن هذا الإجراء.')">
+                    <i class="bi bi-trash3 me-1"></i>تأكيد تصفير الرصيد
+                </button>
             </div>
         </form>
     </div>
