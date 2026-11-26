@@ -33,6 +33,7 @@ function sidebarLink(string $href, string $icon, string $label, string $current)
         <?= sidebarLink('wallet_topups.php', 'wallet2', 'طلبات شحن المحافظ', $currentPage) ?>
         <?= sidebarLink('reports.php', 'bar-chart-line', 'التقارير', $currentPage) ?>
         <?= sidebarLink('settings_deposit_types.php', 'gear', 'إعداد نسب الأرباح', $currentPage) ?>
+        <?= sidebarLink('company_payment_methods.php', 'bank', 'حسابات وقنوات التحويل', $currentPage) ?>
 
         <?php if (currentRole() === 'admin'): ?>
             <?= sidebarLink('archived_records.php', 'archive', 'أرشيف المحذوفات', $currentPage) ?>

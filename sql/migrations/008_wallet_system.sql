@@ -49,3 +49,36 @@ CREATE TABLE IF NOT EXISTS `wallet_transactions` (
   KEY `idx_wt_type` (`type`),
   CONSTRAINT `fk_wt_investor` FOREIGN KEY (`investor_id`) REFERENCES `investors` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `company_payment_methods` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(100) NOT NULL,
+  `type` ENUM('bank','wallet','exchange','cash') NOT NULL DEFAULT 'bank',
+  `account_title` VARCHAR(150) NOT NULL,
+  `account_number` VARCHAR(150) NOT NULL,
+  `currency` VARCHAR(20) NOT NULL DEFAULT 'ALL',
+  `instructions` TEXT NULL,
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `display_order` INT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wallet_transfers` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `transfer_no` VARCHAR(40) NOT NULL,
+  `sender_investor_id` INT UNSIGNED NOT NULL,
+  `receiver_investor_id` INT UNSIGNED NOT NULL,
+  `amount` DECIMAL(14,2) NOT NULL,
+  `currency` ENUM('IQD','USD') NOT NULL DEFAULT 'USD',
+  `note` VARCHAR(255) NULL,
+  `status` ENUM('completed','failed','reversed') NOT NULL DEFAULT 'completed',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_transfer_no` (`transfer_no`),
+  KEY `idx_wt_sender` (`sender_investor_id`),
+  KEY `idx_wt_receiver` (`receiver_investor_id`),
+  CONSTRAINT `fk_wtrf_sender` FOREIGN KEY (`sender_investor_id`) REFERENCES `investors` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_wtrf_receiver` FOREIGN KEY (`receiver_investor_id`) REFERENCES `investors` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

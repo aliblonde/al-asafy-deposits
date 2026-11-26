@@ -19,7 +19,7 @@
     </queries>
 
     <application
-        android:label="العسافي للاستثمارات"
+        android:label="AL-ASAFY"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"

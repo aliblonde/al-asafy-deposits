@@ -332,4 +332,41 @@ class ApiService {
       return {'success': false, 'message': 'فشل إرسال طلب الشحن: $e'};
     }
   }
+
+  // Lookup Recipient Investor by Wallet ID, Username, or Phone
+  static Future<Map<String, dynamic>> lookupInvestor(String query) async {
+    final url = Uri.parse('$baseUrl/wallet_lookup.php?query=${Uri.encodeComponent(query.trim())}');
+    try {
+      final headers = await _getHeaders();
+      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 10));
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'تعذر التحقق من المستثمر: $e'};
+    }
+  }
+
+  // Execute P2P Transfer to another Investor
+  static Future<Map<String, dynamic>> transferToInvestor({
+    required int receiverId,
+    required double amount,
+    required String currency,
+    String? note,
+  }) async {
+    final url = Uri.parse('$baseUrl/wallet_transfer.php');
+    try {
+      final headers = await _getHeaders();
+      final body = jsonEncode({
+        'receiver_id': receiverId,
+        'amount': amount,
+        'currency': currency,
+        'note': note,
+      });
+      final res = await http.post(url, headers: headers, body: body).timeout(const Duration(seconds: 20));
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'فشل تنفيذ الحوالة: $e'};
+    }
+  }
 }

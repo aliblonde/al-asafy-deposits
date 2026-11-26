@@ -145,41 +145,49 @@ $txStmt = $pdo->prepare("
 $txStmt->execute([$investorId]);
 $walletTransactions = $txStmt->fetchAll();
 
-// 8. Company official payment channels for top-ups
-$companyChannels = [
-    [
-        'id' => 'bank_fib',
-        'name' => 'مصرف العراق الأول (FIB)',
-        'type' => 'bank',
-        'account_title' => 'مجموعة العسافي للاستثمارات المالية',
-        'account_number' => 'IQ78FIBK00010000000001234567',
-        'instructions' => 'يرجى كتابة اسم المستثمر في حقل الملاحظات عند التحويل وإرفاق وصل التحويل هنا.'
-    ],
-    [
-        'id' => 'zaincash',
-        'name' => 'محفظة زين كاش (ZainCash)',
-        'type' => 'wallet',
-        'account_title' => 'محفظة الأعمال المعتمدة - مجموعة العسافي',
-        'account_number' => '07731111861',
-        'instructions' => 'التحويل المالي المباشر عبر تطبيق زين كاش لرقم المحفظة وإرفاق لقطة شاشة الإشعار.'
-    ],
-    [
-        'id' => 'qicard',
-        'name' => 'محفظة كي كارد (Qi Card / SuperQi)',
-        'type' => 'wallet',
-        'account_title' => 'حساب الدفع المعتمد - مجموعة العسافي',
-        'account_number' => '07731111861',
-        'instructions' => 'تحويل من محفظة SuperQi أو بطاقة الماستر كارد التابعة لـ Qi.'
-    ],
-    [
-        'id' => 'exchange_office',
-        'name' => 'الحوالات المعتمدة ومكاتب الصيرفة',
-        'type' => 'exchange',
-        'account_title' => 'شركة الطيف / الروابي للصرافة',
-        'account_number' => 'فرع بغداد - باسم مجموعة العسافي للاستثمارات',
-        'instructions' => 'تسليم الحوالة بالفرع أو استلام وصل الإيداع وإرفاق صورته في التطبيق.'
-    ]
-];
+// 8. Company official payment channels for top-ups (Dynamic from Database)
+$companyChannels = [];
+try {
+    $cStmt = $pdo->query("SELECT id, name, type, account_title, account_number, currency, instructions FROM company_payment_methods WHERE is_active = 1 ORDER BY display_order ASC, id ASC");
+    $companyChannels = $cStmt->fetchAll();
+} catch (\Throwable $e) {}
+
+if (empty($companyChannels)) {
+    $companyChannels = [
+        [
+            'id' => 1,
+            'name' => 'مصرف العراق الأول (FIB)',
+            'type' => 'bank',
+            'account_title' => 'مجموعة العسافي للاستثمارات المالية',
+            'account_number' => 'IQ78FIBK00010000000001234567',
+            'instructions' => 'يرجى كتابة اسم المستثمر في حقل الملاحظات عند التحويل وإرفاق وصل التحويل هنا.'
+        ],
+        [
+            'id' => 2,
+            'name' => 'محفظة زين كاش (ZainCash)',
+            'type' => 'wallet',
+            'account_title' => 'محفظة الأعمال المعتمدة - مجموعة العسافي',
+            'account_number' => '07731111861',
+            'instructions' => 'التحويل المالي المباشر عبر تطبيق زين كاش لرقم المحفظة وإرفاق لقطة شاشة الإشعار.'
+        ],
+        [
+            'id' => 3,
+            'name' => 'محفظة كي كارد (Qi Card / SuperQi)',
+            'type' => 'wallet',
+            'account_title' => 'حساب الدفع المعتمد - مجموعة العسافي',
+            'account_number' => '07731111861',
+            'instructions' => 'تحويل من محفظة SuperQi أو بطاقة الماستر كارد التابعة لـ Qi.'
+        ],
+        [
+            'id' => 4,
+            'name' => 'الحوالات المعتمدة ومكاتب الصيرفة',
+            'type' => 'exchange',
+            'account_title' => 'شركة الطيف / الروابي للصرافة',
+            'account_number' => 'فرع بغداد - باسم مجموعة العسافي للاستثمارات',
+            'instructions' => 'تسليم الحوالة بالفرع أو استلام وصل الإيداع وإرفاق صورته في التطبيق.'
+        ]
+    ];
+}
 
 apiResponse(true, [
     'wallet_id' => 'W-' . str_pad((string)$investorId, 6, '0', STR_PAD_LEFT),

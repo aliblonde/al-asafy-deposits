@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../constants/theme.dart';
 import '../services/api_service.dart';
 import 'withdraw_dialog.dart';
@@ -68,8 +70,99 @@ class _WalletTabState extends State<WalletTab> {
     showDialog(
       context: context,
       builder: (_) => WithdrawDialog(
-        deposits: const [], // General profit withdrawal
+        deposits: const [],
         onSuccess: _fetchWallet,
+      ),
+    );
+  }
+
+  void _openTransferSheet(double availableBalance) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _WalletTransferSheet(
+        availableBalance: availableBalance,
+        currency: _selectedCurrency,
+        onSuccess: () {
+          Navigator.of(ctx).pop();
+          _fetchWallet();
+        },
+      ),
+    );
+  }
+
+  void _showMyQrDialog(String walletId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.bgCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppTheme.borderGold, width: 1.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.qr_code_2, color: AppTheme.gold, size: 28),
+            SizedBox(width: 8),
+            Text('رمز محفظتي الرقمية', style: TextStyle(color: AppTheme.gold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.qr_code_scanner, size: 140, color: Colors.grey.shade900),
+                  const SizedBox(height: 8),
+                  Text(
+                    walletId,
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'شارك رقم محفظتك مع المستثمرين الآخرين لتلقي الحوالات الفورية مباشرة.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.gold,
+                side: const BorderSide(color: AppTheme.gold),
+              ),
+              icon: const Icon(Icons.copy, size: 16),
+              label: Text('نسخ رقم المحفظة: $walletId'),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: walletId));
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('تم نسخ $walletId'), backgroundColor: AppTheme.gold),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('إغلاق', style: TextStyle(color: AppTheme.textMuted)),
+          ),
+        ],
       ),
     );
   }
@@ -102,7 +195,7 @@ class _WalletTabState extends State<WalletTab> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('المحفظة الرقمية'),
+        title: const Text('المحفظة الرقمية (AL-ASAFY)'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: AppTheme.gold),
@@ -130,8 +223,8 @@ class _WalletTabState extends State<WalletTab> {
 
               const SizedBox(height: 18),
 
-              // 3. Quick Action Buttons
-              _buildActionButtons(),
+              // 3. Quick Action Buttons (2x2 Grid)
+              _buildActionButtons(totalAvail),
 
               const SizedBox(height: 24),
 
@@ -237,7 +330,7 @@ class _WalletTabState extends State<WalletTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'مجموعة العسافي للاستثمارات',
+                        'مجموعة العسافي (AL-ASAFY)',
                         style: TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       Text(
@@ -300,7 +393,7 @@ class _WalletTabState extends State<WalletTab> {
           ),
           const SizedBox(height: 6),
 
-          // Detail breakdown: (Profits + Topups)
+          // Detail breakdown
           Text(
             _hideBalance
                 ? '••••'
@@ -316,20 +409,33 @@ class _WalletTabState extends State<WalletTab> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.qr_code, color: AppTheme.gold, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    walletId,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: Colors.white,
-                    ),
+              GestureDetector(
+                onTap: () => _showMyQrDialog(walletId),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.gold.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      const Icon(Icons.qr_code, color: AppTheme.gold, size: 18),
+                      const SizedBox(width: 6),
+                      Text(
+                        walletId,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.touch_app, size: 12, color: AppTheme.gold),
+                    ],
+                  ),
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -415,82 +521,107 @@ class _WalletTabState extends State<WalletTab> {
     );
   }
 
-  // Quick Action Buttons
-  Widget _buildActionButtons() {
-    return Row(
+  // Quick Action Buttons (2x2 Grid)
+  Widget _buildActionButtons(double availableBalance) {
+    return Column(
       children: [
-        // 1. Top-up Button
-        Expanded(
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.gold,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(Icons.add_card, size: 18),
-            label: const Text('شحن المحفظة', style: TextStyle(fontWeight: FontWeight.bold)),
-            onPressed: _openTopupSheet,
-          ),
-        ),
-        const SizedBox(width: 8),
-
-        // 2. Withdraw Button
-        Expanded(
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppTheme.gold,
-              side: const BorderSide(color: AppTheme.gold),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            icon: const Icon(Icons.arrow_upward, size: 18),
-            label: const Text('سحب الأرباح', style: TextStyle(fontWeight: FontWeight.bold)),
-            onPressed: _openWithdrawDialog,
-          ),
-        ),
-        const SizedBox(width: 8),
-
-        // 3. New Investment Button (Coming Soon strictly as requested)
-        Expanded(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.textMuted,
-                  side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+        // Row 1: Top-up & Withdraw
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.gold,
+                  foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                icon: const Icon(Icons.diamond_outlined, size: 18),
-                label: const Text('استثمار جديد', style: TextStyle(fontSize: 12)),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('ميزة فتح استثمار جديد من المحفظة ستتاح قريباً بعد اعتماد الآلية من الإدارة.'),
-                      backgroundColor: AppTheme.gold,
-                    ),
-                  );
-                },
+                icon: const Icon(Icons.add_card, size: 18),
+                label: const Text('شحن المحفظة', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: _openTopupSheet,
               ),
-              Positioned(
-                top: -6,
-                right: -2,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppTheme.danger,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'قريباً',
-                    style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                  ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.gold,
+                  side: const BorderSide(color: AppTheme.gold),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                icon: const Icon(Icons.arrow_upward, size: 18),
+                label: const Text('سحب الأرباح', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: _openWithdrawDialog,
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        // Row 2: P2P Transfer & New Investment (Coming Soon)
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E2836),
+                  foregroundColor: AppTheme.gold,
+                  side: const BorderSide(color: AppTheme.gold, width: 1),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.swap_horiz, size: 20, color: AppTheme.gold),
+                label: const Text('تحويل لمستثمر', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () => _openTransferSheet(availableBalance),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.textMuted,
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.diamond_outlined, size: 18),
+                      label: const Text('استثمار جديد', style: TextStyle(fontSize: 12)),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('ميزة فتح استثمار جديد من المحفظة ستتاح قريباً بعد اعتماد الآلية من الإدارة.'),
+                            backgroundColor: AppTheme.gold,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    top: -6,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.danger,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'قريباً',
+                        style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -887,6 +1018,368 @@ class _WalletTopupSheetState extends State<_WalletTopupSheet> {
                   child: _isSubmitting
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
                       : const Text('تأكيد وإرسال طلب الشحن', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// -------------------------------------------------------------
+// Bottom Sheet for P2P Investor-to-Investor Transfer
+// -------------------------------------------------------------
+class _WalletTransferSheet extends StatefulWidget {
+  final double availableBalance;
+  final String currency;
+  final VoidCallback onSuccess;
+
+  const _WalletTransferSheet({
+    required this.availableBalance,
+    required this.currency,
+    required this.onSuccess,
+  });
+
+  @override
+  State<_WalletTransferSheet> createState() => _WalletTransferSheetState();
+}
+
+class _WalletTransferSheetState extends State<_WalletTransferSheet> {
+  final _searchCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  final _noteCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  bool _isSearching = false;
+  Map<String, dynamic>? _verifiedRecipient;
+  String? _lookupError;
+
+  bool _isSubmitting = false;
+
+  void _searchRecipient() async {
+    final q = _searchCtrl.text.trim();
+    if (q.isEmpty) return;
+
+    setState(() {
+      _isSearching = true;
+      _lookupError = null;
+      _verifiedRecipient = null;
+    });
+
+    final res = await ApiService.lookupInvestor(q);
+
+    if (!mounted) return;
+    setState(() {
+      _isSearching = false;
+      if (res['success'] == true && res['data'] != null) {
+        _verifiedRecipient = res['data'] as Map<String, dynamic>;
+        _lookupError = null;
+      } else {
+        _lookupError = res['message'] ?? 'لم يتم العثور على المستثمر';
+        _verifiedRecipient = null;
+      }
+    });
+  }
+
+  void _submitTransfer() async {
+    if (_verifiedRecipient == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى التحقق من المستلم أولاً.'), backgroundColor: AppTheme.warning),
+      );
+      return;
+    }
+
+    if (!_formKey.currentState!.validate()) return;
+    final amt = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+    if (amt <= 0) return;
+
+    if (amt > widget.availableBalance) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('المبلغ المطلوب ($amt) يتجاوز رصيدك المتاح (${widget.availableBalance} ${widget.currency}).'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+      return;
+    }
+
+    // Biometric Security Confirmation
+    final localAuth = LocalAuthentication();
+    try {
+      final canCheck = await localAuth.canCheckBiometrics || await localAuth.isDeviceSupported();
+      if (canCheck) {
+        final auth = await localAuth.authenticate(
+          localizedReason: 'يرجى تأكيد البصمة لإتمام الحوالة المالية إلى ${_verifiedRecipient!['full_name']}',
+          options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
+        );
+        if (!auth) return;
+      }
+    } catch (_) {}
+
+    setState(() => _isSubmitting = true);
+
+    final res = await ApiService.transferToInvestor(
+      receiverId: _verifiedRecipient!['recipient_id'] as int,
+      amount: amt,
+      currency: widget.currency,
+      note: _noteCtrl.text.trim(),
+    );
+
+    setState(() => _isSubmitting = false);
+
+    if (res['success'] == true) {
+      if (!mounted) return;
+      final transferData = res['data'] as Map<String, dynamic>?;
+      final trfNo = transferData?['transfer_no'] ?? '';
+      final recName = transferData?['receiver_name'] ?? _verifiedRecipient!['full_name'];
+
+      // Show Success Receipt Dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (c) => AlertDialog(
+          backgroundColor: AppTheme.bgCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppTheme.success, width: 1.5),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: AppTheme.success, size: 28),
+              SizedBox(width: 8),
+              Text('تم التحويل بنجاح', style: TextStyle(color: AppTheme.success, fontSize: 17)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('تم إرسال مبلغ $amt ${widget.currency} بنجاح إلى:'),
+              const SizedBox(height: 6),
+              Text(recName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.gold)),
+              const SizedBox(height: 8),
+              Text('رقم الحوالة: $trfNo', style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: AppTheme.textMuted)),
+              const Divider(color: AppTheme.borderGold, height: 20),
+              const Text('تم خصم المبلغ من رصيدك المتاح وإضافته لمحفظة المستلم فوراً.', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+            ],
+          ),
+          actions: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.share, size: 16),
+              label: const Text('مشاركة الإشعار'),
+              onPressed: () {
+                final text = 'إشعار تحويل مالي عبر مجموعة العسافي\nالمبلغ: $amt ${widget.currency}\nالمستلم: $recName\nرقم الحوالة: $trfNo';
+                final url = Uri.parse('https://wa.me/?text=${Uri.encodeComponent(text)}');
+                launchUrl(url, mode: LaunchMode.externalApplication);
+              },
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold, foregroundColor: Colors.black),
+              child: const Text('إغلاق'),
+              onPressed: () {
+                Navigator.of(c).pop();
+                widget.onSuccess();
+              },
+            ),
+          ],
+        ),
+      );
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(res['message'] ?? 'فشل التحويل'), backgroundColor: AppTheme.danger),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _amountCtrl.dispose();
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(
+        top: 20,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      decoration: const BoxDecoration(
+        color: AppTheme.bgCard,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'تحويل رصيد لمستثمر آخر',
+                    style: TextStyle(color: AppTheme.gold, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white70),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const Divider(color: AppTheme.borderGold),
+
+              // Available Balance notice
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.gold.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.account_balance_wallet, size: 16, color: AppTheme.gold),
+                    const SizedBox(width: 8),
+                    Text(
+                      'رصيدك المتاح للتحويل: ${widget.availableBalance.toStringAsFixed(2)} ${widget.currency}',
+                      style: const TextStyle(color: AppTheme.gold, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // Search Recipient input
+              const Text('رقم محفظة أو اسم مستخدم المستلم:', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _searchCtrl,
+                      decoration: const InputDecoration(
+                        hintText: 'مثال: W-000105 أو اسم المستخدم',
+                        prefixIcon: Icon(Icons.search, color: AppTheme.gold),
+                      ),
+                      onFieldSubmitted: (_) => _searchRecipient(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.gold,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                    onPressed: _isSearching ? null : _searchRecipient,
+                    child: _isSearching
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                        : const Text('تحقق', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+
+              // Lookup Result Banner
+              if (_verifiedRecipient != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.success),
+                  ),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        backgroundColor: AppTheme.success,
+                        radius: 18,
+                        child: Icon(Icons.check, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _verifiedRecipient!['full_name'],
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 14),
+                            ),
+                            Text(
+                              'رقم المحفظة: ${_verifiedRecipient!['wallet_id']} | اسم المستخدم: ${_verifiedRecipient!['username']}',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              if (_lookupError != null) ...[
+                const SizedBox(height: 8),
+                Text(_lookupError!, style: const TextStyle(color: AppTheme.danger, fontSize: 12)),
+              ],
+
+              const SizedBox(height: 14),
+
+              // Amount to Transfer
+              TextFormField(
+                controller: _amountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: 'المبلغ المراد تحويله (${widget.currency}) *',
+                  prefixIcon: const Icon(Icons.payments_outlined, color: AppTheme.gold),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'المبلغ مطلوب';
+                  final val = double.tryParse(v.trim());
+                  if (val == null || val <= 0) return 'مبلغ غير صالح';
+                  if (val > widget.availableBalance) return 'المبلغ يتجاوز رصيدك المتاح';
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              // Note
+              TextFormField(
+                controller: _noteCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'ملاحظة أو سبب الحوالة (اختياري)',
+                  prefixIcon: Icon(Icons.notes, color: AppTheme.gold),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Submit Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.gold,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.lock_outline, size: 18),
+                  label: _isSubmitting
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                      : const Text('تأكيد التحويل بالبصمة', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  onPressed: (_isSubmitting || _verifiedRecipient == null) ? null : _submitTransfer,
                 ),
               ),
             ],

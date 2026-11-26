@@ -21,7 +21,7 @@ class AlAsafyApp extends StatelessWidget {
       valueListenable: AppTheme.themeModeNotifier,
       builder: (context, currentMode, _) {
         return MaterialApp(
-          title: 'مجموعة العسافي للاستثمارات',
+          title: 'AL-ASAFY',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
