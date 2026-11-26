@@ -9,6 +9,7 @@ require_once __DIR__ . '/../config/logger.php';
 require_once __DIR__ . '/../config/notifications.php';
 require_once __DIR__ . '/../config/wallet_schema.php';
 
+requireLogin();
 $pdo = getPDO();
 ensureWalletSystemSchema($pdo);
 
@@ -237,29 +238,55 @@ $dateTo = trim($_GET['date_to'] ?? '');
 $searchQuery = trim($_GET['q'] ?? '');
 
 // 1. KPI Financial Summaries
-$kpiStmt = $pdo->query("
-    SELECT 
-        COALESCE(SUM(CASE WHEN currency = 'USD' THEN balance ELSE 0 END), 0) AS total_usd_direct,
-        COALESCE(SUM(CASE WHEN currency = 'IQD' THEN balance ELSE 0 END), 0) AS total_iqd_direct
-    FROM wallet_balances
-");
-$kpiDirect = $kpiStmt->fetch();
+$kpiDirect = ['total_usd_direct' => 0.0, 'total_iqd_direct' => 0.0];
+try {
+    $kpiStmt = $pdo->query("
+        SELECT 
+            COALESCE(SUM(CASE WHEN currency = 'USD' THEN balance ELSE 0 END), 0) AS total_usd_direct,
+            COALESCE(SUM(CASE WHEN currency = 'IQD' THEN balance ELSE 0 END), 0) AS total_iqd_direct
+        FROM wallet_balances
+    ");
+    $row = $kpiStmt ? $kpiStmt->fetch() : null;
+    if ($row) {
+        $kpiDirect = $row;
+    }
+} catch (\Throwable $e) {
+    error_log("KPI Direct fetch error: " . $e->getMessage());
+}
 
-$topupKpi = $pdo->query("
-    SELECT 
-        COUNT(*) AS total_topups,
-        COALESCE(SUM(CASE WHEN currency = 'USD' AND status = 'approved' THEN amount ELSE 0 END), 0) AS approved_usd,
-        COALESCE(SUM(CASE WHEN currency = 'IQD' AND status = 'approved' THEN amount ELSE 0 END), 0) AS approved_iqd
-    FROM wallet_topup_requests
-")->fetch();
+$topupKpi = ['total_topups' => 0, 'approved_usd' => 0.0, 'approved_iqd' => 0.0];
+try {
+    $topupStmt = $pdo->query("
+        SELECT 
+            COUNT(*) AS total_topups,
+            COALESCE(SUM(CASE WHEN currency = 'USD' AND status = 'approved' THEN amount ELSE 0 END), 0) AS approved_usd,
+            COALESCE(SUM(CASE WHEN currency = 'IQD' AND status = 'approved' THEN amount ELSE 0 END), 0) AS approved_iqd
+        FROM wallet_topup_requests
+    ");
+    $row = $topupStmt ? $topupStmt->fetch() : null;
+    if ($row) {
+        $topupKpi = $row;
+    }
+} catch (\Throwable $e) {
+    error_log("Topup KPI error: " . $e->getMessage());
+}
 
-$transferKpi = $pdo->query("
-    SELECT 
-        COUNT(*) AS total_transfers,
-        COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END), 0) AS transfer_usd,
-        COALESCE(SUM(CASE WHEN currency = 'IQD' THEN amount ELSE 0 END), 0) AS transfer_iqd
-    FROM wallet_transfers
-")->fetch();
+$transferKpi = ['total_transfers' => 0, 'transfer_usd' => 0.0, 'transfer_iqd' => 0.0];
+try {
+    $trfStmt = $pdo->query("
+        SELECT 
+            COUNT(*) AS total_transfers,
+            COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount ELSE 0 END), 0) AS transfer_usd,
+            COALESCE(SUM(CASE WHEN currency = 'IQD' THEN amount ELSE 0 END), 0) AS transfer_iqd
+        FROM wallet_transfers
+    ");
+    $row = $trfStmt ? $trfStmt->fetch() : null;
+    if ($row) {
+        $transferKpi = $row;
+    }
+} catch (\Throwable $e) {
+    error_log("Transfer KPI error: " . $e->getMessage());
+}
 
 // 2. Fetch Investors with Wallets & Profits
 $invSql = "
@@ -267,8 +294,6 @@ $invSql = "
         i.id,
         i.full_name,
         i.phone,
-        i.email,
-        i.status,
         COALESCE(wb_usd.balance, 0) AS wallet_usd,
         COALESCE(wb_iqd.balance, 0) AS wallet_iqd,
         COALESCE(p_usd.avail_profit, 0) AS profit_usd,
@@ -295,9 +320,14 @@ if (!empty($searchQuery)) {
 }
 $invSql .= " ORDER BY (COALESCE(wb_usd.balance, 0) + COALESCE(wb_iqd.balance, 0)) DESC, i.id DESC";
 
-$invStmt = $pdo->prepare($invSql);
-$invStmt->execute($invParams);
-$investorWallets = $invStmt->fetchAll();
+$investorWallets = [];
+try {
+    $invStmt = $pdo->prepare($invSql);
+    $invStmt->execute($invParams);
+    $investorWallets = $invStmt->fetchAll();
+} catch (\Throwable $e) {
+    error_log("investorWallets error: " . $e->getMessage());
+}
 
 // 3. Fetch Full Wallet Transactions Ledger
 $txSql = "
@@ -335,9 +365,14 @@ if (!empty($dateTo)) {
 }
 $txSql .= " ORDER BY wt.id DESC LIMIT 150";
 
-$txStmt = $pdo->prepare($txSql);
-$txStmt->execute($txParams);
-$transactions = $txStmt->fetchAll();
+$transactions = [];
+try {
+    $txStmt = $pdo->prepare($txSql);
+    $txStmt->execute($txParams);
+    $transactions = $txStmt->fetchAll();
+} catch (\Throwable $e) {
+    error_log("transactions error: " . $e->getMessage());
+}
 
 // Helper for type badges
 function getTxBadge(string $type, string $direction): array {

@@ -7,8 +7,8 @@ function ensureWalletSystemSchema(PDO $pdo): void
     if ($executed) return;
     $executed = true;
 
+    // 1. Wallet Balances Table
     try {
-        // 1. Wallet Balances Table
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS `wallet_balances` (
               `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -20,8 +20,10 @@ function ensureWalletSystemSchema(PDO $pdo): void
               UNIQUE KEY `uq_wb_investor_currency` (`investor_id`, `currency`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    } catch (\Throwable $e) { error_log("wb table error: " . $e->getMessage()); }
 
-        // 2. Wallet Top-up Requests Table
+    // 2. Wallet Top-up Requests Table
+    try {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS `wallet_topup_requests` (
               `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -42,8 +44,10 @@ function ensureWalletSystemSchema(PDO $pdo): void
               KEY `idx_wtr_status` (`status`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    } catch (\Throwable $e) { error_log("wtr table error: " . $e->getMessage()); }
 
-        // 3. P2P Transfers Table
+    // 3. P2P Transfers Table
+    try {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS `wallet_transfers` (
               `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -61,8 +65,10 @@ function ensureWalletSystemSchema(PDO $pdo): void
               KEY `idx_wt_receiver` (`receiver_investor_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    } catch (\Throwable $e) { error_log("wt table error: " . $e->getMessage()); }
 
-        // 4. Wallet Transactions Ledger
+    // 4. Wallet Transactions Ledger
+    try {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS `wallet_transactions` (
               `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -81,13 +87,15 @@ function ensureWalletSystemSchema(PDO $pdo): void
               KEY `idx_wt_type` (`type`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    } catch (\Throwable $e) { error_log("wtx table error: " . $e->getMessage()); }
 
-        // Ensure type column is VARCHAR to support all types (admin_debit, admin_reset, p2p_transfer, etc.)
-        try {
-            $pdo->exec("ALTER TABLE `wallet_transactions` MODIFY COLUMN `type` VARCHAR(50) NOT NULL");
-        } catch (\Throwable $e) {}
+    // Ensure type column is VARCHAR to support all types (admin_debit, admin_reset, p2p_transfer, etc.)
+    try {
+        $pdo->exec("ALTER TABLE `wallet_transactions` MODIFY COLUMN `type` VARCHAR(50) NOT NULL");
+    } catch (\Throwable $e) {}
 
-        // 5. Company Payment Methods
+    // 5. Company Payment Methods
+    try {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS `company_payment_methods` (
               `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -104,8 +112,10 @@ function ensureWalletSystemSchema(PDO $pdo): void
               PRIMARY KEY (`id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    } catch (\Throwable $e) { error_log("cpm table error: " . $e->getMessage()); }
 
-        // 6. Ensure Wallet Permissions exist in `permissions` table
+    // 6. Ensure Wallet Permissions exist in `permissions` table
+    try {
         $permissions = [
             [
                 'name' => 'wallets.view',
@@ -140,8 +150,7 @@ function ensureWalletSystemSchema(PDO $pdo): void
                 $insPerm->execute([$p['name'], $p['label_ar'], $p['category']]);
             } catch (\Throwable $e) {}
         }
-
     } catch (\Throwable $e) {
-        error_log("ensureWalletSystemSchema notice: " . $e->getMessage());
+        error_log("permissions insert error: " . $e->getMessage());
     }
 }
