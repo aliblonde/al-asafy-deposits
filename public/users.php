@@ -72,8 +72,12 @@ include __DIR__ . '/../includes/sidebar.php';
                             </td>
                             <td class="text-center">
                                 <a href="user_edit.php?id=<?= $u['id'] ?>" class="btn btn-sm btn-outline-gold"
-                                    title="تعديل">
-                                    <i class="bi bi-pencil-square"></i> تعديل
+                                    title="تعديل الحساب">
+                                    <i class="bi bi-pencil-square me-1"></i> تعديل
+                                </a>
+                                <a href="user_edit.php?id=<?= $u['id'] ?>#permissions" class="btn btn-sm btn-outline-info ms-1"
+                                    title="تخصيص صلاحيات الموظف والمحافظ">
+                                    <i class="bi bi-shield-lock me-1"></i> الصلاحيات
                                 </a>
                             </td>
                         </tr>

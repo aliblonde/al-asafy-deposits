@@ -3,6 +3,7 @@
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/wallet_schema.php';
 
 /**
  * Check if a user possesses a specific permission.
@@ -23,6 +24,9 @@ function userCan(string $permissionName, ?int $userId = null): bool
 
     try {
         $pdo = getPDO();
+        if (str_starts_with($permissionName, 'wallets.') || $permissionName === 'permissions.manage') {
+            ensureWalletSystemSchema($pdo);
+        }
         // 1. Check explicit user_permissions overrides (Explicit Deny/Allow overrides role)
         $stmt = $pdo->prepare("
             SELECT up.permission_type 

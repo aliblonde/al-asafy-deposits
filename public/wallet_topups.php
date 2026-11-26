@@ -7,9 +7,14 @@ require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/logger.php';
 require_once __DIR__ . '/../config/notifications.php';
+require_once __DIR__ . '/../config/wallet_schema.php';
 
-requirePermission('deposits.view');
 $pdo = getPDO();
+ensureWalletSystemSchema($pdo);
+
+if (!userCan('wallets.topup') && !userCan('deposits.view') && currentRole() !== 'admin') {
+    requirePermission('wallets.topup');
+}
 
 // Ensure wallet tables exist
 $pdo->exec("
@@ -364,7 +369,7 @@ include __DIR__ . '/../includes/header.php';
                                             <?php endif; ?>
                                         </td>
                                         <td class="text-center">
-                                            <?php if ($r['status'] === 'pending' && userCan('deposits.create')): ?>
+                                            <?php if ($r['status'] === 'pending' && (userCan('wallets.topup') || userCan('deposits.create') || currentRole() === 'admin')): ?>
                                                 <button type="button" class="btn btn-sm btn-success me-1" data-bs-toggle="modal" data-bs-target="#approveModal<?= $r['id'] ?>">
                                                     <i class="bi bi-check-lg"></i> اعتماد
                                                 </button>

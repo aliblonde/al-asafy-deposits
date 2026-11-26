@@ -6,9 +6,15 @@ require_once __DIR__ . '/../config/rbac.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/logger.php';
+require_once __DIR__ . '/../config/wallet_schema.php';
 
 requireLogin();
 $pdo = getPDO();
+ensureWalletSystemSchema($pdo);
+
+if (!userCan('wallets.settings') && !userCan('deposits.create') && currentRole() !== 'admin') {
+    requirePermission('wallets.settings');
+}
 
 // Ensure company_payment_methods table exists
 $pdo->exec("
@@ -45,7 +51,7 @@ if ($count === 0) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
 
-    if (!userCan('deposits.create') && currentRole() !== 'admin') {
+    if (!userCan('wallets.settings') && !userCan('deposits.create') && currentRole() !== 'admin') {
         setFlash('danger', 'ليس لديك الصلاحية لإدارة حسابات وقنوات التحويل.');
         header('Location: company_payment_methods.php');
         exit;

@@ -6,10 +6,12 @@ require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/logger.php';
 require_once __DIR__ . '/../config/rbac.php';
+require_once __DIR__ . '/../config/wallet_schema.php';
 
 requirePermission('users.manage');
 
 $pdo = getPDO();
+ensureWalletSystemSchema($pdo);
 $userId = (int) ($_GET['id'] ?? 0);
 $errors = [];
 
@@ -164,7 +166,7 @@ include __DIR__ . '/../includes/sidebar.php';
                 </div>
 
                 <?php if ($canManagePerms && !empty($allPermissions)): ?>
-                    <hr class="my-4 border-secondary">
+                    <hr class="my-4 border-secondary" id="permissions">
                     <div class="mb-4">
                         <h5 class="text-gold mb-2"><i class="bi bi-shield-lock me-1"></i> تخصيص الصلاحيات الفردية (Allow / Deny)</h5>
                         <p class="small text-muted mb-3">تطبيق استثناءات صريحة على صلاحيات المستخدم الموروثة من دوره.</p>

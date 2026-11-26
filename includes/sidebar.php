@@ -1,6 +1,7 @@
 <?php
 // includes/sidebar.php
 require_once __DIR__ . '/../config/csrf.php';
+require_once __DIR__ . '/../config/rbac.php';
 $currentPage = basename($_SERVER['PHP_SELF']);
 function sidebarLink(string $href, string $icon, string $label, string $current): string
 {
@@ -26,14 +27,23 @@ function sidebarLink(string $href, string $icon, string $label, string $current)
         <?= sidebarLink('declare_rates.php', 'percent', 'إعلان نسب الأرباح', $currentPage) ?>
         <?= sidebarLink('profit_run.php', 'currency-dollar', 'صرف الأرباح', $currentPage) ?>
 
+        <div class="nav-section-label mt-3">نظام المحافظ الرقمية</div>
+        <?php if (currentRole() === 'admin' || userCan('wallets.view')): ?>
+            <?= sidebarLink('wallets.php', 'wallet2', 'سجل وتقارير المحافظ', $currentPage) ?>
+        <?php endif; ?>
+        <?php if (currentRole() === 'admin' || userCan('wallets.topup')): ?>
+            <?= sidebarLink('wallet_topups.php', 'box-arrow-in-down', 'طلبات شحن المحافظ', $currentPage) ?>
+        <?php endif; ?>
+        <?php if (currentRole() === 'admin' || userCan('wallets.settings')): ?>
+            <?= sidebarLink('company_payment_methods.php', 'credit-card-2-front', 'حسابات وقنوات التحويل', $currentPage) ?>
+        <?php endif; ?>
+
         <div class="nav-section-label mt-3">الإدارة</div>
         <?= sidebarLink('investors.php', 'people', 'المستثمرون', $currentPage) ?>
         <?= sidebarLink('approval_requests.php', 'file-earmark-check', 'طلبات الموافقة', $currentPage) ?>
         <?= sidebarLink('withdraw_requests.php', 'arrow-up-circle', 'طلبات سحب الأرباح', $currentPage) ?>
-        <?= sidebarLink('wallet_topups.php', 'wallet2', 'طلبات شحن المحافظ', $currentPage) ?>
         <?= sidebarLink('reports.php', 'bar-chart-line', 'التقارير', $currentPage) ?>
         <?= sidebarLink('settings_deposit_types.php', 'gear', 'إعداد نسب الأرباح', $currentPage) ?>
-        <?= sidebarLink('company_payment_methods.php', 'bank', 'حسابات وقنوات التحويل', $currentPage) ?>
 
         <?php if (currentRole() === 'admin'): ?>
             <?= sidebarLink('archived_records.php', 'archive', 'أرشيف المحذوفات', $currentPage) ?>
