@@ -132,7 +132,21 @@ $topupStmt = $pdo->prepare("
     LIMIT 20
 ");
 $topupStmt->execute([$investorId]);
-$topupRequests = $topupStmt->fetchAll();
+$topupRows = $topupStmt->fetchAll();
+$topupRequests = [];
+foreach ($topupRows as $row) {
+    $topupRequests[] = [
+        'id' => (int)$row['id'],
+        'amount' => (float)$row['amount'],
+        'currency' => (string)$row['currency'],
+        'payment_method' => (string)($row['payment_method'] ?? ''),
+        'transfer_reference' => (string)($row['transfer_reference'] ?? ''),
+        'receipt_image' => (string)($row['receipt_image'] ?? ''),
+        'note' => (string)($row['note'] ?? ''),
+        'status' => (string)$row['status'],
+        'created_at' => (string)$row['created_at'],
+    ];
+}
 
 // 7. Fetch wallet transactions history
 $txStmt = $pdo->prepare("
@@ -143,7 +157,20 @@ $txStmt = $pdo->prepare("
     LIMIT 30
 ");
 $txStmt->execute([$investorId]);
-$walletTransactions = $txStmt->fetchAll();
+$txRows = $txStmt->fetchAll();
+$walletTransactions = [];
+foreach ($txRows as $row) {
+    $walletTransactions[] = [
+        'id' => (int)$row['id'],
+        'type' => (string)$row['type'],
+        'direction' => (string)$row['direction'],
+        'amount' => (float)$row['amount'],
+        'currency' => (string)$row['currency'],
+        'balance_after' => (float)($row['balance_after'] ?? 0),
+        'note' => (string)($row['note'] ?? ''),
+        'created_at' => (string)$row['created_at'],
+    ];
+}
 
 // 8. Company official payment channels for top-ups (Dynamic from Database)
 $companyChannels = [];

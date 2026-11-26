@@ -12,11 +12,17 @@ $user = requireApiAuth();
 $investorId = (int)$user['investor_id'];
 $pdo = getPDO();
 
-// Ensure receipts directory exists
-$uploadDir = __DIR__ . '/../../uploads/receipts';
-if (!is_dir($uploadDir)) {
-    @mkdir($uploadDir, 0775, true);
+// Ensure receipts directories exist (both in public and root)
+$uploadDirs = [
+    __DIR__ . '/../uploads/receipts',
+    __DIR__ . '/../../uploads/receipts',
+];
+foreach ($uploadDirs as $dir) {
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
 }
+$primaryUploadDir = $uploadDirs[0];
 
 $amount = 0.0;
 $currency = 'USD';
@@ -45,8 +51,18 @@ if (str_contains($contentType, 'multipart/form-data')) {
             apiResponse(false, null, 'صيغة الملف غير مدعومة. المسموح: JPG, PNG, WEBP, PDF.', 422);
         }
         $filename = 'topup_' . $investorId . '_' . uniqid() . '.' . $ext;
-        $dest = $uploadDir . '/' . $filename;
-        if (move_uploaded_file($file['tmp_name'], $dest)) {
+        $saved = false;
+        foreach ($uploadDirs as $dir) {
+            $dest = $dir . '/' . $filename;
+            if (!$saved) {
+                if (move_uploaded_file($file['tmp_name'], $dest)) {
+                    $saved = true;
+                }
+            } else {
+                @copy($uploadDirs[0] . '/' . $filename, $dest);
+            }
+        }
+        if ($saved) {
             $receiptPath = 'uploads/receipts/' . $filename;
         }
     }
@@ -70,8 +86,13 @@ if (str_contains($contentType, 'multipart/form-data')) {
         $decoded = base64_decode($base64);
         if ($decoded !== false && strlen($decoded) > 0) {
             $filename = 'topup_' . $investorId . '_' . uniqid() . '.' . $ext;
-            $dest = $uploadDir . '/' . $filename;
-            if (file_put_contents($dest, $decoded)) {
+            $saved = false;
+            foreach ($uploadDirs as $dir) {
+                if (file_put_contents($dir . '/' . $filename, $decoded)) {
+                    $saved = true;
+                }
+            }
+            if ($saved) {
                 $receiptPath = 'uploads/receipts/' . $filename;
             }
         }

@@ -10,6 +10,15 @@ import '../constants/theme.dart';
 import '../services/api_service.dart';
 import 'withdraw_dialog.dart';
 
+double _safeDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    return double.tryParse(value.replaceAll(',', '').trim()) ?? 0.0;
+  }
+  return 0.0;
+}
+
 class WalletTab extends StatefulWidget {
   const WalletTab({super.key});
 
@@ -19,6 +28,7 @@ class WalletTab extends StatefulWidget {
 
 class _WalletTabState extends State<WalletTab> {
   bool _isLoading = true;
+  String? _errorMessage;
   Map<String, dynamic>? _walletData;
   String _selectedCurrency = 'USD';
   bool _hideBalance = false;
@@ -31,15 +41,29 @@ class _WalletTabState extends State<WalletTab> {
   }
 
   Future<void> _fetchWallet() async {
-    setState(() => _isLoading = true);
-    final res = await ApiService.getWalletData();
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        if (res['success'] == true && res['data'] != null) {
-          _walletData = res['data'] as Map<String, dynamic>;
-        }
-      });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final res = await ApiService.getWalletData();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (res['success'] == true && res['data'] != null) {
+            _walletData = Map<String, dynamic>.from(res['data'] as Map);
+          } else {
+            _errorMessage = res['message']?.toString() ?? 'تعذر تحميل بيانات المحفظة';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'حدث خطأ في الاتصال: $e';
+        });
+      }
     }
   }
 
@@ -177,19 +201,54 @@ class _WalletTabState extends State<WalletTab> {
       );
     }
 
-    final totalAvailMap = (_walletData?['total_available'] as Map<String, dynamic>?) ?? {};
-    final totalAvail = (totalAvailMap[_selectedCurrency] as num?)?.toDouble() ?? 0.0;
+    if (_errorMessage != null && _walletData == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('المحفظة الرقمية (AL-ASAFY)'),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 50, color: AppTheme.danger),
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: Colors.white70),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.gold,
+                    foregroundColor: Colors.black,
+                  ),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('إعادة المحاولة'),
+                  onPressed: _fetchWallet,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
-    final capitalMap = (_walletData?['invested_capital'] as Map<String, dynamic>?) ?? {};
-    final investedCapital = (capitalMap[_selectedCurrency] as num?)?.toDouble() ?? 0.0;
+    final totalAvailMap = _walletData?['total_available'];
+    final totalAvail = totalAvailMap is Map ? _safeDouble(totalAvailMap[_selectedCurrency]) : 0.0;
 
-    final directBalMap = (_walletData?['direct_wallet_balance'] as Map<String, dynamic>?) ?? {};
-    final directBal = (directBalMap[_selectedCurrency] as num?)?.toDouble() ?? 0.0;
+    final capitalMap = _walletData?['invested_capital'];
+    final investedCapital = capitalMap is Map ? _safeDouble(capitalMap[_selectedCurrency]) : 0.0;
 
-    final profitsMap = (_walletData?['available_profits'] as Map<String, dynamic>?) ?? {};
-    final profitsBal = (profitsMap[_selectedCurrency] as num?)?.toDouble() ?? 0.0;
+    final directBalMap = _walletData?['direct_wallet_balance'];
+    final directBal = directBalMap is Map ? _safeDouble(directBalMap[_selectedCurrency]) : 0.0;
 
-    final walletId = _walletData?['wallet_id'] ?? 'W-000000';
+    final profitsMap = _walletData?['available_profits'];
+    final profitsBal = profitsMap is Map ? _safeDouble(profitsMap[_selectedCurrency]) : 0.0;
+
+    final walletId = _walletData?['wallet_id']?.toString() ?? 'W-000000';
     final topupList = (_walletData?['topup_requests'] as List<dynamic>?) ?? [];
     final channels = (_walletData?['company_channels'] as List<dynamic>?) ?? [];
 
@@ -678,11 +737,13 @@ class _WalletTabState extends State<WalletTab> {
   }
 
   // Topup Item Widget
-  Widget _buildTopupItem(Map<String, dynamic> req) {
-    final status = req['status'] ?? 'pending';
-    final amount = (req['amount'] as num?)?.toDouble() ?? 0.0;
-    final cur = req['currency'] ?? 'USD';
-    final date = req['created_at'] ?? '';
+  Widget _buildTopupItem(dynamic reqRaw) {
+    if (reqRaw is! Map) return const SizedBox.shrink();
+    final req = Map<String, dynamic>.from(reqRaw);
+    final status = req['status']?.toString() ?? 'pending';
+    final amount = _safeDouble(req['amount']);
+    final cur = req['currency']?.toString() ?? 'USD';
+    final date = req['created_at']?.toString() ?? '';
 
     Color statusColor;
     String statusText;
@@ -1121,7 +1182,7 @@ class _WalletTransferSheetState extends State<_WalletTransferSheet> {
     setState(() => _isSubmitting = true);
 
     final res = await ApiService.transferToInvestor(
-      receiverId: _verifiedRecipient!['recipient_id'] as int,
+      receiverId: int.tryParse(_verifiedRecipient!['recipient_id']?.toString() ?? '0') ?? 0,
       amount: amt,
       currency: widget.currency,
       note: _noteCtrl.text.trim(),

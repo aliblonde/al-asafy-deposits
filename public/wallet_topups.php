@@ -308,9 +308,45 @@ include __DIR__ . '/../includes/header.php';
                                         </td>
                                         <td>
                                             <?php if (!empty($r['receipt_image'])): ?>
-                                                <a href="/<?= htmlspecialchars($r['receipt_image']) ?>" target="_blank" class="btn btn-sm btn-outline-info">
+                                                <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#receiptModal<?= $r['id'] ?>">
                                                     <i class="bi bi-image me-1"></i>عرض الوصل
-                                                </a>
+                                                </button>
+
+                                                <!-- Receipt Modal -->
+                                                <div class="modal fade" id="receiptModal<?= $r['id'] ?>" tabindex="-1">
+                                                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                                                        <div class="modal-content bg-card border-secondary text-white">
+                                                            <div class="modal-header border-secondary">
+                                                                <h5 class="modal-title">
+                                                                    <i class="bi bi-receipt me-2 text-gold"></i>إشعار التحويل - طلب #<?= $r['id'] ?>
+                                                                </h5>
+                                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                            </div>
+                                                            <div class="modal-body text-center p-3">
+                                                                <div class="mb-3">
+                                                                    <span class="badge bg-secondary me-2"><?= htmlspecialchars($r['payment_method']) ?></span>
+                                                                    <span class="text-gold fw-bold"><?= formatMoney((float)$r['amount'], $r['currency']) ?></span>
+                                                                    <?php if (!empty($r['transfer_reference'])): ?>
+                                                                        <div class="small text-muted mt-1">مرجع: <?= htmlspecialchars($r['transfer_reference']) ?></div>
+                                                                    <?php endif; ?>
+                                                                </div>
+                                                                <div class="border rounded p-2 bg-dark">
+                                                                    <img src="view_receipt.php?id=<?= $r['id'] ?>" 
+                                                                         alt="وصل التحويل" 
+                                                                         class="img-fluid rounded" 
+                                                                         style="max-height: 550px; object-fit: contain;"
+                                                                         onerror="this.onerror=null; this.src='/<?= htmlspecialchars($r['receipt_image']) ?>';">
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer border-secondary justify-content-between">
+                                                                <a href="view_receipt.php?id=<?= $r['id'] ?>" target="_blank" class="btn btn-sm btn-outline-gold">
+                                                                    <i class="bi bi-box-arrow-up-right me-1"></i>فتح في علامة تبويب جديدة
+                                                                </a>
+                                                                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             <?php else: ?>
                                                 <span class="text-muted small">بدون وصل</span>
                                             <?php endif; ?>
