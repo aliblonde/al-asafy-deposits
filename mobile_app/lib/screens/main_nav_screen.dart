@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../constants/theme.dart';
 import '../services/api_service.dart';
 import 'home_tab.dart';
+import 'wallet_tab.dart';
 import 'deposits_tab.dart';
 import 'transactions_tab.dart';
 import 'profile_tab.dart';
@@ -20,6 +21,7 @@ class _MainNavScreenState extends State<MainNavScreen> {
 
   final List<Widget> _tabs = const [
     HomeTab(),
+    WalletTab(),
     DepositsTab(),
     TransactionsTab(),
     ProfileTab(),
@@ -106,6 +108,11 @@ class _MainNavScreenState extends State<MainNavScreen> {
             icon: Icon(Icons.dashboard_outlined),
             activeIcon: Icon(Icons.dashboard),
             label: 'الرئيسية',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            activeIcon: Icon(Icons.account_balance_wallet),
+            label: 'المحفظة',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.account_balance_outlined),

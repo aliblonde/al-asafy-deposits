@@ -6,6 +6,7 @@ require_once __DIR__ . '/../config/helpers.php';
 require_once __DIR__ . '/../config/csrf.php';
 require_once __DIR__ . '/../config/logger.php';
 require_once __DIR__ . '/../config/rbac.php';
+require_once __DIR__ . '/../config/notifications.php';
 
 requirePermission('investors.view');
 $pdo = getPDO();
@@ -78,6 +79,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
+        if ($action === 'credit_wallet') {
+        if (!userCan('investors.edit')) {
+            http_response_code(403);
+            setFlash('danger', 'ليس لديك صلاحية لشحن المحفظة.');
+            header('Location: investor_view.php?id=' . $id);
+            exit;
+        }
+
+        $amount = (float)($_POST['amount'] ?? 0);
+        $currency = strtoupper(trim((string)($_POST['currency'] ?? 'USD')));
+        $note = trim((string)($_POST['note'] ?? 'شحن رصيد محفظة / أرباح استثنائية من الإدارة'));
+
+        if ($amount <= 0) {
+            setFlash('danger', 'يرجى إدخال مبلغ صحيح أكبر من الصفر.');
+        } elseif (!in_array($currency, ['USD', 'IQD'], true)) {
+            setFlash('danger', 'العملة المختارة غير مدعومة.');
+        } else {
+            try {
+                $pdo->beginTransaction();
+
+                // Ensure table exists
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS `wallet_balances` (
+                      `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                      `investor_id` INT UNSIGNED NOT NULL,
+                      `currency` ENUM('IQD','USD') NOT NULL DEFAULT 'USD',
+                      `balance` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                      `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                      PRIMARY KEY (`id`),
+                      UNIQUE KEY `uq_wb_investor_currency` (`investor_id`, `currency`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                    CREATE TABLE IF NOT EXISTS `wallet_transactions` (
+                      `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                      `investor_id` INT UNSIGNED NOT NULL,
+                      `type` ENUM('topup_credit','admin_credit','profit_transfer','withdrawal','investment_out') NOT NULL,
+                      `direction` ENUM('credit','debit') NOT NULL DEFAULT 'credit',
+                      `amount` DECIMAL(14,2) NOT NULL,
+                      `currency` ENUM('IQD','USD') NOT NULL DEFAULT 'USD',
+                      `balance_after` DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                      `reference_id` INT UNSIGNED NULL,
+                      `note` VARCHAR(255) NULL,
+                      `created_by` INT UNSIGNED NULL,
+                      `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                      PRIMARY KEY (`id`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                ");
+
+                // Update wallet_balances
+                $stmtWb = $pdo->prepare("
+                    INSERT INTO wallet_balances (investor_id, currency, balance, updated_at)
+                    VALUES (?, ?, ?, NOW())
+                    ON DUPLICATE KEY UPDATE balance = balance + VALUES(balance), updated_at = NOW()
+                ");
+                $stmtWb->execute([$id, $currency, $amount]);
+
+                // Fetch new balance
+                $bStmt = $pdo->prepare("SELECT balance FROM wallet_balances WHERE investor_id = ? AND currency = ?");
+                $bStmt->execute([$id, $currency]);
+                $newBal = (float)$bStmt->fetchColumn();
+
+                // Insert into wallet_transactions
+                $txW = $pdo->prepare("
+                    INSERT INTO wallet_transactions (investor_id, type, direction, amount, currency, balance_after, note, created_by, created_at)
+                    VALUES (?, 'admin_credit', 'credit', ?, ?, ?, ?, ?, NOW())
+                ");
+                $txW->execute([$id, $amount, $currency, $newBal, $note, currentUserId()]);
+
+                // Insert into transactions
+                $receiptNo = 'WCR-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -5));
+                $txMain = $pdo->prepare("
+                    INSERT INTO transactions (receipt_no, investor_id, type, direction, amount, currency, date, note)
+                    VALUES (?, ?, 'profit_payout', 'credit', ?, ?, NOW(), ?)
+                ");
+                $txMain->execute([$receiptNo, $id, $amount, $currency, '[شحن محفظة] ' . $note]);
+
+                // Log Activity
+                logActivity($pdo, 'ADMIN_CREDIT_WALLET', 'wallet_balances', $id, null, [
+                    'admin_id' => currentUserId(),
+                    'investor_id' => $id,
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'new_balance' => $newBal,
+                    'note' => $note
+                ]);
+
+                $pdo->commit();
+
+                // Send instant Firebase push notification & in-app
+                $formattedAmount = number_format($amount, 2);
+                notifyInvestor(
+                    $pdo,
+                    $id,
+                    'إيداع رصيد في محفظتك 💳',
+                    "تمت إضافة مبلغ {$formattedAmount} {$currency} إلى محفظتك بنجاح من الإدارة. الملاحظة: {$note}",
+                    'wallet'
+                );
+
+                setFlash('success', "تم شحن محفظة المستثمر بمبلغ {$formattedAmount} {$currency} بنجاح وإرسال إشعار فوري له.");
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                setFlash('danger', 'حدث خطأ أثناء شحن المحفظة: ' . $e->getMessage());
+            }
+        }
+        header('Location: investor_view.php?id=' . $id);
+        exit;
+    }
+
     if ($action === 'reset_password') {
         // Section 4: Require explicit permission for password reset
         if (!userCan('investor_accounts.reset_password')) {
@@ -155,6 +266,16 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id]);
 $balances = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
+// Fetch wallet balances
+$walletBalances = ['IQD' => 0.0, 'USD' => 0.0];
+try {
+    $wbStmt = $pdo->prepare("SELECT currency, balance FROM wallet_balances WHERE investor_id = ?");
+    $wbStmt->execute([$id]);
+    while ($wbr = $wbStmt->fetch()) {
+        $walletBalances[$wbr['currency']] = (float)$wbr['balance'];
+    }
+} catch (\Throwable $e) {}
+
 $pageTitle = 'عرض بيانات المستثمر';
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -169,6 +290,11 @@ include __DIR__ . '/../includes/header.php';
             <div class="page-header">
                 <h1 class="page-title"><i class="bi bi-person-lines-fill me-2"></i>عرض بيانات المستثمر</h1>
                 <div class="d-flex gap-2">
+                                        <?php if (userCan('investors.edit')): ?>
+                    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
+                        <i class="bi bi-wallet2 me-1"></i> شحن المحفظة
+                    </button>
+                    <?php endif; ?>
                     <a href="investor_add.php?edit=<?= $id ?>" class="btn btn-outline-gold btn-sm">
                         <i class="bi bi-pencil me-1"></i> تعديل
                     </a>
@@ -227,6 +353,40 @@ include __DIR__ . '/../includes/header.php';
                                 <div class="p-2 rounded bg-base small text-muted border border-gold"
                                     style="min-height: 50px;">
                                     <?= nl2br(htmlspecialchars($investor['notes'] ?: 'لا توجد ملاحظات.')) ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                                        <!-- Digital Wallet Card -->
+                    <div class="form-card mb-4 border border-warning" style="background: linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(20,24,31,0.95) 100%);">
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                            <h5 class="section-title mb-0 text-gold">
+                                <i class="bi bi-wallet2 me-2"></i>رصيد المحفظة المتاح (الأرباح والرصيد المشحون)
+                            </h5>
+                            <?php if (userCan('investors.edit')): ?>
+                            <button type="button" class="btn btn-sm btn-gold" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
+                                <i class="bi bi-plus-circle me-1"></i> إضافة رصيد
+                            </button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="p-3 rounded bg-base border border-gold text-center">
+                                    <div class="text-muted small mb-1">رصيد المحفظة الحر (IQD)</div>
+                                    <div class="fs-4 fw-bold text-success">
+                                        <?= formatMoney($walletBalances['IQD'] ?? 0, 'IQD') ?>
+                                    </div>
+                                    <small class="text-muted" style="font-size:11px;">مستقل عن دورة الأرباح الشهرية</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="p-3 rounded bg-base border border-gold text-center">
+                                    <div class="text-muted small mb-1">رصيد المحفظة الحر (USD)</div>
+                                    <div class="fs-4 fw-bold text-success">
+                                        <?= formatMoney($walletBalances['USD'] ?? 0, 'USD') ?>
+                                    </div>
+                                    <small class="text-muted" style="font-size:11px;">مستقل عن دورة الأرباح الشهرية</small>
                                 </div>
                             </div>
                         </div>
@@ -348,6 +508,40 @@ include __DIR__ . '/../includes/header.php';
                         <?php endif; ?>
                     </div>
 
+                                        <!-- Digital Wallet Card -->
+                    <div class="form-card mb-4 border border-warning" style="background: linear-gradient(135deg, rgba(212,175,55,0.08) 0%, rgba(20,24,31,0.95) 100%);">
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                            <h5 class="section-title mb-0 text-gold">
+                                <i class="bi bi-wallet2 me-2"></i>رصيد المحفظة المتاح (الأرباح والرصيد المشحون)
+                            </h5>
+                            <?php if (userCan('investors.edit')): ?>
+                            <button type="button" class="btn btn-sm btn-gold" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
+                                <i class="bi bi-plus-circle me-1"></i> إضافة رصيد
+                            </button>
+                            <?php endif; ?>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="p-3 rounded bg-base border border-gold text-center">
+                                    <div class="text-muted small mb-1">رصيد المحفظة الحر (IQD)</div>
+                                    <div class="fs-4 fw-bold text-success">
+                                        <?= formatMoney($walletBalances['IQD'] ?? 0, 'IQD') ?>
+                                    </div>
+                                    <small class="text-muted" style="font-size:11px;">مستقل عن دورة الأرباح الشهرية</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="p-3 rounded bg-base border border-gold text-center">
+                                    <div class="text-muted small mb-1">رصيد المحفظة الحر (USD)</div>
+                                    <div class="fs-4 fw-bold text-success">
+                                        <?= formatMoney($walletBalances['USD'] ?? 0, 'USD') ?>
+                                    </div>
+                                    <small class="text-muted" style="font-size:11px;">مستقل عن دورة الأرباح الشهرية</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-card">
                         <h5 class="section-title border-bottom pb-2 mb-3">
                             <i class="bi bi-shield-lock me-2"></i>حساب الدخول
@@ -394,7 +588,12 @@ include __DIR__ . '/../includes/header.php';
                                     <small class="text-muted">المستثمر لا يملك وصولاً للبوابة</small>
                                 </div>
                             </div>
-                            <a href="investor_add.php?edit=<?= $id ?>" class="btn btn-gold btn-sm w-100 mt-3">إنشاء حساب
+                                                <?php if (userCan('investors.edit')): ?>
+                    <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#creditWalletModal">
+                        <i class="bi bi-wallet2 me-1"></i> شحن المحفظة
+                    </button>
+                    <?php endif; ?>
+                    <a href="investor_add.php?edit=<?= $id ?>" class="btn btn-gold btn-sm w-100 mt-3">إنشاء حساب
                                 الآن</a>
                         <?php endif; ?>
                     </div>
@@ -433,6 +632,48 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 <?php endif; ?>
+<!-- Credit Wallet Modal -->
+<div class="modal fade" id="creditWalletModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" action="" class="modal-content text-start" dir="rtl">
+            <div class="modal-header">
+                <h5 class="modal-title text-gold"><i class="bi bi-wallet2 me-2"></i>شحن محفظة المستثمر</h5>
+                <button type="button" class="btn-close ms-0 me-auto" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <?= csrfField() ?>
+                <input type="hidden" name="action" value="credit_wallet">
+                
+                <div class="alert alert-info py-2 small mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    سيتم إضافة هذا المبلغ فوراً إلى محفظة المستثمر كرصيد أرباح متاح للسحب، وهو <strong>مستقل تماماً عن دورة الأرباح الشهرية</strong> ولن يؤثر على مواعيد استحقاق الودائع.
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">المبلغ المطلوب إيداعه <span class="text-danger">*</span></label>
+                    <input type="number" name="amount" step="0.01" min="0.01" class="form-control" required placeholder="0.00">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">العملة <span class="text-danger">*</span></label>
+                    <select name="currency" class="form-select" required>
+                        <option value="USD">دولار أمريكي (USD)</option>
+                        <option value="IQD">دينار عراقي (IQD)</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">الملاحظة / سبب الشحن <span class="text-danger">*</span></label>
+                    <input type="text" name="note" class="form-control" required placeholder="مثال: إيداع نقدي بالفرع، أرباح استثنائية، تسوية حساب...">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i>تأكيد الشحن الفوري</button>
+            </div>
+        </form>
+    </div>
+</div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>
     </div>
 </div>

@@ -25,9 +25,21 @@ $summaryRows = $stmtSum->fetchAll();
 
 // Structure summaries
 $summary = [
-    'IQD' => ['principal' => 0.0, 'accumulated_profit' => 0.0, 'paid_profit' => 0.0, 'deposits_count' => 0],
-    'USD' => ['principal' => 0.0, 'accumulated_profit' => 0.0, 'paid_profit' => 0.0, 'deposits_count' => 0],
+    'IQD' => ['principal' => 0.0, 'accumulated_profit' => 0.0, 'paid_profit' => 0.0, 'wallet_balance' => 0.0, 'deposits_count' => 0],
+    'USD' => ['principal' => 0.0, 'accumulated_profit' => 0.0, 'paid_profit' => 0.0, 'wallet_balance' => 0.0, 'deposits_count' => 0],
 ];
+
+// Fetch direct wallet balances if table exists
+try {
+    $wbStmt = $pdo->prepare("SELECT currency, balance FROM wallet_balances WHERE investor_id = ?");
+    $wbStmt->execute([$investorId]);
+    while ($wbr = $wbStmt->fetch()) {
+        $c = $wbr['currency'];
+        if (isset($summary[$c])) {
+            $summary[$c]['wallet_balance'] = (float)$wbr['balance'];
+        }
+    }
+} catch (\Throwable $e) {}
 
 foreach ($summaryRows as $row) {
     $cur = $row['currency'];

@@ -291,4 +291,45 @@ class ApiService {
       return {'success': false};
     }
   }
+
+  // Get Digital Wallet Data
+  static Future<Map<String, dynamic>> getWalletData() async {
+    final url = Uri.parse('$baseUrl/wallet.php');
+    try {
+      final headers = await _getHeaders();
+      final res = await http.get(url, headers: headers).timeout(const Duration(seconds: 12));
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'تعذر الاتصال بخادم المحفظة: $e'};
+    }
+  }
+
+  // Submit Wallet Top-up with receipt image
+  static Future<Map<String, dynamic>> submitWalletTopup({
+    required double amount,
+    required String currency,
+    required String paymentMethod,
+    String? transferReference,
+    String? receiptBase64,
+    String? note,
+  }) async {
+    final url = Uri.parse('$baseUrl/wallet_topup.php');
+    try {
+      final headers = await _getHeaders();
+      final body = jsonEncode({
+        'amount': amount,
+        'currency': currency,
+        'payment_method': paymentMethod,
+        'transfer_reference': transferReference,
+        'receipt_base64': receiptBase64,
+        'note': note,
+      });
+      final res = await http.post(url, headers: headers, body: body).timeout(const Duration(seconds: 25));
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data;
+    } catch (e) {
+      return {'success': false, 'message': 'فشل إرسال طلب الشحن: $e'};
+    }
+  }
 }

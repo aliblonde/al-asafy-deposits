@@ -30,6 +30,7 @@ function sidebarLink(string $href, string $icon, string $label, string $current)
         <?= sidebarLink('investors.php', 'people', 'المستثمرون', $currentPage) ?>
         <?= sidebarLink('approval_requests.php', 'file-earmark-check', 'طلبات الموافقة', $currentPage) ?>
         <?= sidebarLink('withdraw_requests.php', 'arrow-up-circle', 'طلبات سحب الأرباح', $currentPage) ?>
+        <?= sidebarLink('wallet_topups.php', 'wallet2', 'طلبات شحن المحافظ', $currentPage) ?>
         <?= sidebarLink('reports.php', 'bar-chart-line', 'التقارير', $currentPage) ?>
         <?= sidebarLink('settings_deposit_types.php', 'gear', 'إعداد نسب الأرباح', $currentPage) ?>
 
